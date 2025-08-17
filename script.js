@@ -177,15 +177,19 @@ function countAll(){
 }
 function updateStatus(){
   const {units,tens,hundreds,total}=countAll();
+  const enLetras = numEnLetras(total);
+
   const st=document.getElementById("status");
-  if (st) st.textContent = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
+  if (st) st.textContent = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades — (${enLetras})`;
+
   const b=document.getElementById("breakdown");
   if (b){
     b.innerHTML = `
       <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
       <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
       <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
-      <div class="label">Total</div><div class="value">${total}</div>`;
+      <div class="label">Total</div><div class="value">${total}</div>
+      <div class="label">En letras</div><div class="value">${enLetras}</div>`;
   }
 }
 
@@ -377,7 +381,13 @@ function composeTensInZone() {
   if (changed) { reorderTensZone(); pieceLayer.draw(); }
   return changed;
 }
-
+function numEnLetras(n){
+  try {
+    // La lib expone 'NumeroALetras'
+    if (typeof NumeroALetras === 'function') return NumeroALetras(n);
+  } catch(e) {}
+  return String(n); // por si faltase la librería
+}
 function composeHundredsInZone() {
   if (!zoneHundRect) return false;
   let changed = false;
@@ -437,10 +447,11 @@ function wireUI(){
   $('btn-hundred')?.addEventListener('click', ()=>{ const p = spawnPosHundred(); createHundred(p.x, p.y); });
   $('btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); });
   $('btn-compose')?.addEventListener('click', ()=>{ checkBuildZones(); });
-  $('btn-say')    ?.addEventListener('click', ()=>{
-    const {units,tens,hundreds,total}=countAll();
-    speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}.`);
-  });
+$('btn-say')?.addEventListener('click', ()=>{
+  const {units,tens,hundreds,total}=countAll();
+  const enLetras = numEnLetras(total);
+  speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}. ${enLetras}.`);
+});
   $('btn-challenge')?.addEventListener('click', ()=>{
     const n=Math.floor(Math.random()*900)+100;
     const ch=$('challenge'); if (ch) ch.textContent=`Forma el número ${n}`;
