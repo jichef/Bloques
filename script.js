@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.10: centrado inicial real + no solapar + Konva 9 fixes) =====
-console.log("Bloques v16.10");
+// ===== Bloques — script.js (v16.11: fixes Konva find()+centro real + no solapar) =====
+console.log("Bloques v16.11");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -41,10 +41,10 @@ stage.add(gridLayer, uiLayer, pieceLayer);
 // Transformación global (pan/zoom)
 const world = { x: 0, y: 0, scale: 1 };
 function applyWorldTransform() {
-  [gridLayer, uiLayer, pieceLayer].forEach(L => {
+  for (const L of [gridLayer, uiLayer, pieceLayer]) {
     L.position({ x: world.x, y: world.y });
     L.scale({ x: world.scale, y: world.scale });
-  });
+  }
   stage.batchDraw();
 }
 
@@ -132,22 +132,12 @@ let ZONES = null;
 let zoneTenRect = null;
 let zoneHundRect = null;
 
-// (A) Zonas con margen fijo (por si alguna vez lo necesitas)
-function computeZonesFixed() {
-  const margin = GRID * 2;
-  const tens = { x: margin, y: margin, w: GRID * 10, h: GRID * 1,  label: "Zona Decenas (1×10)" };
-  const hund = { x: margin, y: tens.y + tens.h + GRID * 2, w: GRID * 10, h: GRID * 10, label: "Zona Centenas (10×10)" };
-  ZONES = { tens, hund };
-}
-
-// (B) Zonas centradas en la vista actual (lo que queremos por defecto)
+// Zonas centradas en la vista actual
 function computeZonesCentered() {
-  const r = visibleWorldRect();          // rectángulo visible en coords mundo
+  const r = visibleWorldRect();
   const gap = GRID * 2;
   const tensW = 10*GRID, tensH = 1*GRID;
   const hundW = 10*GRID, hundH = 10*GRID;
-
-  // Altura total del bloque (tens arriba, gap, hundreds abajo)
   const totalH = tensH + gap + hundH;
 
   const cx = toCell(r.x + r.w/2);
@@ -155,7 +145,6 @@ function computeZonesCentered() {
 
   const tensX = toCell(cx - tensW/2);
   const hundX = toCell(cx - hundW/2);
-
   const topY  = toCell(cy - totalH/2);
   const tensY = topY;
   const hundY = topY + tensH + gap;
@@ -176,41 +165,34 @@ function drawZones() {
   uiLayer.draw();
 }
 
-// Centrar zonas ahora mismo (se usa tras fitWorldToStage, reset y resize)
-function centerZonesInCurrentView() {
-  computeZonesCentered();
-  drawZones();
-}
-
-// ----- Helpers de piezas (Konva 9: usar .each) -----
+// ----- Helpers de piezas (find() -> array) -----
 function getPieceGroups(){
   const out = [];
-  pieceLayer.find('Group').each(g=>{
+  const groups = pieceLayer.find('Group'); // array en tu build
+  for (const g of groups) {
     const t = (g.name && g.name()) || (g.getAttr && g.getAttr('btype'));
     if (t === 'unit' || t === 'ten' || t === 'hundred') out.push(g);
-  });
+  }
   return out;
 }
 
 // ======= NO SOLAPAR =======
 function overlapsAny(rect, ignoreId=null){
-  let hit = false;
-  getPieceGroups().forEach(g=>{
-    if (ignoreId && g._id === ignoreId) return;
+  for (const g of getPieceGroups()){
+    if (ignoreId && g._id === ignoreId) continue;
     const r = g.getClientRect();
-    if (rectsIntersect(rect, {x:r.x,y:r.y,w:r.width,h:r.height})) hit = true;
-  });
-  return hit;
+    if (rectsIntersect(rect, {x:r.x,y:r.y,w:r.width,h:r.height})) return true;
+  }
+  return false;
 }
 
 function findFreeSpot(x, y, w, h, ignoreId=null, maxRings=20){
-  // Búsqueda en espiral de celdas libres alrededor de (x,y)
   const origin = snap(x,y);
   if (!overlapsAny({x:origin.x,y:origin.y,w,h}, ignoreId)) return origin;
   let step = GRID;
   let dx = 0, dy = 0, dir = 0, leg = 1, traveled = 0, turns = 0;
   let cx = origin.x, cy = origin.y;
-  const dirs = [[1,0],[0,1],[-1,0],[0,-1]]; // derecha, abajo, izquierda, arriba
+  const dirs = [[1,0],[0,1],[-1,0],[0,-1]];
   while (turns/2 <= maxRings){
     const [vx, vy] = dirs[dir];
     cx += vx*step; cy += vy*step; traveled += 1;
@@ -218,10 +200,10 @@ function findFreeSpot(x, y, w, h, ignoreId=null, maxRings=20){
     if (!overlapsAny({x:candidate.x,y:candidate.y,w,h}, ignoreId)) return candidate;
     if (traveled === leg){
       traveled = 0; dir = (dir+1) % 4; turns++;
-      if (turns % 2 === 0) leg++; // cada dos giros aumentamos la pierna
+      if (turns % 2 === 0) leg++;
     }
   }
-  return origin; // fallback
+  return origin;
 }
 
 function ensureNoOverlapFor(group){
@@ -231,16 +213,15 @@ function ensureNoOverlapFor(group){
   group.position(pos);
 }
 
-// ----- Contador + descomposición (robusto) -----
+// ----- Contador + descomposición -----
 function countAll(){
-  const pieces = getPieceGroups();
   let units = 0, tens = 0, hundreds = 0;
-  pieces.forEach(g=>{
+  for (const g of getPieceGroups()){
     const t = (g.name && g.name()) || g.getAttr('btype');
     if (t==='unit') units++;
     else if (t==='ten') tens++;
     else if (t==='hundred') hundreds++;
-  });
+  }
   return { units, tens, hundreds, total: units + 10*tens + 100*hundreds };
 }
 
@@ -305,10 +286,10 @@ function reorderTensZone(){
   if (!zoneTenRect) return;
   const z = ZONES.tens;
   const units = [];
-  getPieceGroups().forEach(g=>{
+  for (const g of getPieceGroups()){
     const t=(g.name&&g.name())||g.getAttr('btype');
     if (t==='unit' && centerInZone(g, zoneTenRect)) units.push(g);
-  });
+  }
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   units.forEach((g,i)=>{ g.position(snap(z.x + Math.min(i,9)*GRID, z.y)); });
   pieceLayer.batchDraw();
@@ -318,11 +299,11 @@ function reorderHundredsZone(){
   if (!zoneHundRect) return;
   const z = ZONES.hund;
   const tens=[], units=[];
-  getPieceGroups().forEach(g=>{
+  for (const g of getPieceGroups()){
     const t=(g.name&&g.name())||g.getAttr('btype');
-    if (!centerInZone(g, zoneHundRect)) return;
+    if (!centerInZone(g, zoneHundRect)) continue;
     if (t==='ten') tens.push(g); else if (t==='unit') units.push(g);
-  });
+  }
   tens.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   tens.forEach((g,i)=>{ g.position(snap(z.x, z.y + i*GRID)); });
@@ -364,7 +345,7 @@ function addChipRectTo(group, w, h, fill){
 function createUnit(x,y){
   const g=new Konva.Group({ x:toCell(x), y:toCell(y), draggable:true, name:'unit' });
   g.setAttr('btype','unit'); addChipRectTo(g, GRID, GRID, COLORS.unit); onDragEnd(g);
-  const r={w:GRID,h:GRID}; const p=findFreeSpot(g.x(), g.y(), r.w, r.h); g.position(p);
+  const p=findFreeSpot(g.x(), g.y(), GRID, GRID, g._id); g.position(p);
   pieceLayer.add(g); pieceLayer.draw();
   if (zoneTenRect && intersectsZone(g, zoneTenRect)) { g.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); }
   if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
@@ -373,7 +354,7 @@ function createUnit(x,y){
 function createTen(x,y){
   const g=new Konva.Group({ x:toCell(x), y:toCell(y), draggable:true, name:'ten' });
   g.setAttr('btype','ten'); addChipRectTo(g, 10*GRID, GRID, COLORS.ten); onDragEnd(g);
-  const r={w:10*GRID,h:GRID}; const p=findFreeSpot(g.x(), g.y(), r.w, r.h); g.position(p);
+  const p=findFreeSpot(g.x(), g.y(), 10*GRID, GRID, g._id); g.position(p);
   onDouble(g, ()=>{ const start=snap(g.x(), g.y()); g.destroy(); for(let k=0;k<10;k++) createUnit(start.x + k*GRID, start.y); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
   pieceLayer.add(g); pieceLayer.draw();
   if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
@@ -382,7 +363,7 @@ function createTen(x,y){
 function createHundred(x,y){
   const g=new Konva.Group({ x:toCell(x), y:toCell(y), draggable:true, name:'hundred' });
   g.setAttr('btype','hundred'); addChipRectTo(g, 10*GRID, 10*GRID, COLORS.hundred); onDragEnd(g);
-  const r={w:10*GRID,h:10*GRID}; const p=findFreeSpot(g.x(), g.y(), r.w, r.h); g.position(p);
+  const p=findFreeSpot(g.x(), g.y(), 10*GRID, 10*GRID, g._id); g.position(p);
   onDouble(g, ()=>{ const start=snap(g.x(), g.y()); g.destroy(); for(let row=0; row<10; row++) createTen(start.x, start.y + row*GRID); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
   pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
@@ -392,13 +373,13 @@ function composeTensInZone() {
   if (!zoneTenRect) return false;
   let changed = false;
   const rows = new Map();
-  getPieceGroups().forEach(n=>{
+  for (const n of getPieceGroups()){
     const t = (n.name&&n.name())||n.getAttr('btype');
-    if (t!=='unit' || !centerInZone(n, zoneTenRect)) return;
+    if (t!=='unit' || !centerInZone(n, zoneTenRect)) continue;
     const rowY = toCell(n.y());
     if (!rows.has(rowY)) rows.set(rowY, new Map());
     rows.get(rowY).set(toCell(n.x()), n);
-  });
+  }
   rows.forEach((mapX, rowY)=>{
     const xs = Array.from(mapX.keys()).sort((a,b)=>a-b);
     for (let i=0; i<=xs.length-10; i++){
@@ -412,7 +393,7 @@ function composeTensInZone() {
     }
   });
   if (!changed) {
-    const pool=[]; getPieceGroups().forEach(n=>{ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneTenRect)) pool.push(n); });
+    const pool=[]; for (const n of getPieceGroups()){ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneTenRect)) pool.push(n); }
     if (pool.length>=10){
       const anchor=snap(pool[0].x(), pool[0].y());
       for (let i=0;i<10;i++) pool[i].destroy();
@@ -427,7 +408,7 @@ function composeHundredsInZone() {
   if (!zoneHundRect) return false;
   let changed = false;
   while (true) {
-    const units=[]; getPieceGroups().forEach(n=>{ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneHundRect)) units.push(n); });
+    const units=[]; for (const n of getPieceGroups()){ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneHundRect)) units.push(n); }
     if (units.length < 10) break;
     const anchor = snap(units[0].x(), units[0].y());
     for (let i=0;i<10;i++) units[i].destroy();
@@ -435,7 +416,7 @@ function composeHundredsInZone() {
     changed = true;
   }
   while (true) {
-    const tens=[]; getPieceGroups().forEach(n=>{ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='ten' && centerInZone(n, zoneHundRect)) tens.push(n); });
+    const tens=[]; for (const n of getPieceGroups()){ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='ten' && centerInZone(n, zoneHundRect)) tens.push(n); }
     if (tens.length < 10) break;
     const anchor = snap(tens[0].x(), tens[0].y());
     for (let i=0;i<10;i++) tens[i].destroy();
@@ -466,7 +447,6 @@ function wireUI(){
   $('btn-hundred')?.addEventListener('click', ()=>{ const p = spawnPosHundred(); createHundred(p.x, p.y); });
   $('btn-clear')  ?.addEventListener('click', ()=>{
     pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus();
-    // Al limpiar, recentrar zonas a la vista actual
     centerZonesInCurrentView();
   });
   $('btn-compose')?.addEventListener('click', ()=>{ checkBuildZones(); });
@@ -500,8 +480,7 @@ function wireUI(){
   bindZoom('btn-zoom-in',  ()=> zoomStep(+1));
   bindZoom('btn-zoom-out', ()=> zoomStep(-1));
   bindZoom('btn-reset-view', ()=>{
-    fitWorldToStage();         // reencuadre del mundo
-    // si no hay piezas, centramos de nuevo las zonas en la vista
+    fitWorldToStage();
     if (!hasAnyPieces()) centerZonesInCurrentView();
   });
 }
@@ -515,15 +494,16 @@ stage.on('wheel', (e)=>{ e.evt.preventDefault(); const old=world.scale; const p=
 stage.on('dblclick dbltap', ()=>{ const p=stage.getPointerPosition(); const old=world.scale; const m={x:(p.x-world.x)/old,y:(p.y-world.y)/old}; let s=Math.min(SCALE_MAX, old*1.25); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform(); });
 
 // ----- Resize & arranque -----
+// Recalcular zonas centradas SI y solo si no hay piezas (para no mover lo que el usuario ya colocó).
 function relayout(){
   stage.width(window.innerWidth);
   stage.height(window.innerHeight);
   drawGrid();
-  fitWorldToStage();           // primero encuadrar
-  if (!hasAnyPieces()) {       // si no hay piezas, recolocar zonas al centro visible
-    centerZonesInCurrentView();
+  fitWorldToStage();
+  if (!hasAnyPieces()) {
+    computeZonesCentered();
+    drawZones();
   } else {
-    // si hay piezas, redibuja zonas en su sitio actual
     drawZones();
   }
   pieceLayer.draw();
@@ -531,11 +511,16 @@ function relayout(){
 }
 window.addEventListener("resize", relayout);
 
-// Boot (orden IMPORTANTE para que queden centradas las zonas)
-drawGrid();
-fitWorldToStage();             // 1) encuadra el mundo
-computeZonesCentered();        // 2) calcula zonas centradas en la vista resultante
-drawZones();                   // 3) dibuja zonas
-wireUI();
-updateStatus();
-pieceLayer.draw();
+// Boot: esperar al layout real del navegador
+window.addEventListener('load', ()=>{
+  // Un frame para que el contenedor tenga tamaño real
+  requestAnimationFrame(()=>{
+    drawGrid();
+    fitWorldToStage();      // 1) encuadra el mundo
+    computeZonesCentered(); // 2) calcula zonas centradas según vista
+    drawZones();            // 3) dibuja zonas
+    wireUI();
+    updateStatus();
+    pieceLayer.draw();
+  });
+});
