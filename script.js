@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.2: 3 Layers + pan/zoom sincronizado + fix ZONES) =====
-console.log("Bloques v16.2");
+// ===== Bloques — script.js (v16.3: zoom buttons funcionando) =====
+console.log("Bloques v16.3");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -24,7 +24,10 @@ const CHIP_STYLE = {
 const WORLD_COLS = 160;
 const WORLD_ROWS = 120;
 
-// ----- Stage y Layers (sin meter Layers dentro de Groups) -----
+// ===== Zoom limits (arriba para evitar TDZ) =====
+const SCALE_MIN = 0.4, SCALE_MAX = 3.0, SCALE_BY = 1.06;
+
+// ----- Stage y Layers -----
 const stage = new Konva.Stage({
   container: "container",
   width: window.innerWidth,
@@ -40,6 +43,15 @@ stage.add(pieceLayer);
 // Transformación global (pan/zoom) aplicada a TODAS las layers
 const world = { x: 0, y: 0, scale: 1 };
 
+function applyWorldTransform() {
+  [gridLayer, uiLayer, pieceLayer].forEach(L => {
+    L.position({ x: world.x, y: world.y });
+    L.scale({ x: world.scale, y: world.scale });
+  });
+  stage.batchDraw();
+}
+
+// Helpers de zoom
 function zoomAt(pointer, targetScale){
   const old = world.scale;
   const s = Math.max(SCALE_MIN, Math.min(SCALE_MAX, targetScale));
@@ -49,18 +61,11 @@ function zoomAt(pointer, targetScale){
   world.y = pointer.y - mouse.y * s;
   applyWorldTransform();
 }
-function zoomStep(direction){ // direction: +1 (in) o -1 (out)
+function zoomStep(direction){ // +1 in / -1 out
   const factor = direction > 0 ? SCALE_BY : 1 / SCALE_BY;
   const target = world.scale * factor;
   const center = { x: stage.width() / 2, y: stage.height() / 2 };
   zoomAt(center, target);
-}
-function applyWorldTransform() {
-  [gridLayer, uiLayer, pieceLayer].forEach(L => {
-    L.position({ x: world.x, y: world.y });
-    L.scale({ x: world.scale, y: world.scale });
-  });
-  stage.batchDraw();
 }
 
 // ----- Cuadrícula -----
@@ -93,11 +98,8 @@ function speak(text){
   try{ const u=new SpeechSynthesisUtterance(text); u.lang="es-ES"; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{}
 }
 
-// get bounding box ABSOLUTO (todas las layers comparten transf.)
-function nodeBoxAbs(n){
-  const r = n.getClientRect(); // absoluto (incluye pan/zoom)
-  return { x: r.x, y: r.y, w: r.width, h: r.height };
-}
+// get bounding box ABSOLUTO
+function nodeBoxAbs(n){ const r = n.getClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }
 function isInsideZone(node, zoneRect){
   const b = nodeBoxAbs(node);
   const z = nodeBoxAbs(zoneRect);
@@ -107,7 +109,7 @@ function isInsideZone(node, zoneRect){
 }
 
 // ----- Zonas 1×10 y 10×10 -----
-let ZONES = null;           // <— ÚNICA declaración
+let ZONES = null; // única declaración
 let zoneTenRect = null;
 let zoneHundRect = null;
 
@@ -177,7 +179,7 @@ function onDouble(group, cb){
   group.on('click',       ()=>{ const now=Date.now(); if(now-lastClick<300) cb(); lastClick=now; });
 }
 
-// ----- Piezas (cada pieza = Group con Rect hijo) -----
+// ----- Piezas -----
 function addChipRectTo(group, w, h, fill){
   const rect = new Konva.Rect({ x: 0, y: 0, width: w, height: h, fill, ...CHIP_STYLE });
   group.add(rect);
@@ -278,12 +280,11 @@ function composeTensInZone() {
   if (changed) pieceLayer.draw();
   return changed;
 }
-
 function composeHundredsInZone() {
   if (!zoneHundRect) return false;
   let changed = false;
 
-  // Unidades -> Decenas (tantas como se pueda)
+  // Unidades -> Decenas
   while (true) {
     const units=[];
     pieceLayer.getChildren().forEach(n=>{
@@ -297,8 +298,7 @@ function composeHundredsInZone() {
     createTen(anchor.x, anchor.y);
     changed = true;
   }
-
-  // Decenas -> Centena (tantas como se pueda)
+  // Decenas -> Centena
   while (true) {
     const tens=[];
     pieceLayer.getChildren().forEach(n=>{
@@ -316,7 +316,6 @@ function composeHundredsInZone() {
   if (changed) pieceLayer.draw();
   return changed;
 }
-
 function checkBuildZones() {
   let changed;
   do {
@@ -330,6 +329,7 @@ function checkBuildZones() {
 // ----- Botonera -----
 function wireUI(){
   const $ = id => document.getElementById(id);
+
   $('btn-unit')   ?.addEventListener('click', ()=>{ const c=centerWorld(); createUnit(c.x,c.y); });
   $('btn-ten')    ?.addEventListener('click', ()=>{ const c=centerWorld(); createTen(c.x-5*GRID,c.y); });
   $('btn-hundred')?.addEventListener('click', ()=>{ const c=centerWorld(); createHundred(c.x-5*GRID,c.y-5*GRID); });
@@ -351,20 +351,28 @@ function wireUI(){
     btn.setAttribute('aria-expanded', String(open));
     panel.setAttribute('aria-hidden', String(!open));
   });
-  $('btn-zoom-in')   ?.addEventListener('click', ()=> zoomStep(+1));
-$('btn-zoom-out')  ?.addEventListener('click', ()=> zoomStep(-1));
-$('btn-reset-view')?.addEventListener('click', ()=>{
-  world.x = 0; world.y = 0; world.scale = 1;
-  applyWorldTransform();
-});
+
+  // 🔍 Botones de zoom
+  const bindZoom = (id, fn) => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('click', (ev)=>{ ev.preventDefault(); fn(); console.log(id,'click'); });
+    el.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); fn(); console.log(id,'pointerdown'); });
+  };
+  bindZoom('btn-zoom-in',  ()=> zoomStep(+1));
+  bindZoom('btn-zoom-out', ()=> zoomStep(-1));
+  bindZoom('btn-reset-view', ()=>{
+    world.x = 0; world.y = 0; world.scale = 1;
+    applyWorldTransform();
+    console.log('reset view');
+  });
 }
 
-// ----- Pan & Zoom (sin Groups padres; sincronizamos las 3 layers) -----
+// ----- Pan & Zoom (rueda/drag) -----
 let isPanning = false;
 let lastPointerPos = null;
 
 stage.on('mousedown touchstart', (e)=>{
-  // Evitar pan si el objetivo está en la capa de piezas (arrastras una ficha)
   if (e.target && e.target.getLayer && e.target.getLayer() === pieceLayer) return;
   isPanning = true;
   lastPointerPos = stage.getPointerPosition();
@@ -382,7 +390,6 @@ stage.on('mousemove touchmove', ()=>{
 });
 stage.on('mouseup touchend', ()=>{ isPanning = false; lastPointerPos = null; });
 
-const SCALE_MIN = 0.4, SCALE_MAX = 3.0, SCALE_BY = 1.06;
 stage.on('wheel', (e)=>{
   e.evt.preventDefault();
   const old = world.scale;
