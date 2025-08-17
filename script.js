@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.8: voz en 2 pasos con pausa) =====
-console.log("Bloques v16.8");
+// ===== Bloques — script.js (v16.8.1: conteo robusto + limpieza) =====
+console.log("Bloques v16.8.1");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -128,7 +128,7 @@ function speak(text){
   }catch{}
 }
 
-// ==== Geometría de zona: intersección / centro dentro ====
+// ==== Geometría de zona ====
 function nodeBoxAbs(n){ const r = n.getClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }
 function rectsIntersect(a,b){
   return !(a.x + a.w <= b.x || a.x >= b.x + b.w || a.y + a.h <= b.y || a.y >= b.y + b.h);
@@ -142,7 +142,7 @@ function centerInZone(node, zoneRect){
 }
 
 // ----- Zonas 1×10 y 10×10 -----
-let ZONES = null; // única declaración
+let ZONES = null;
 let zoneTenRect = null;
 let zoneHundRect = null;
 
@@ -169,10 +169,11 @@ function drawZones() {
 }
 
 // ----- Contador + descomposición -----
+// ✅ Más robusto: usa el selector de Konva y no asume hijos directos
 function countAll(){
   let units=0, tens=0, hundreds=0;
-  pieceLayer.getChildren().forEach(n=>{
-    if (n.getClassName() !== 'Group') return;
+  const groups = pieceLayer.find('Group'); // todos los grupos (piezas)
+  groups.each(n=>{
     const t = n.name() || n.getAttr('btype');
     if (t==='unit') units++;
     else if (t==='ten') tens++;
@@ -225,10 +226,8 @@ function hablarDescompYLetras(h, t, u, total, pausaMs=1000){
 
   const letras = numEnLetras(total);
 
-  // Si no hay descomposición (todo 0), solo leer el número en letras
   if (partes.length === 0) { speak(letras); return; }
 
-  // Construcción natural con “y”
   let descomp = '';
   if (partes.length === 1) descomp = partes[0];
   else if (partes.length === 2) descomp = partes.join(' y ');
@@ -247,31 +246,21 @@ function hablarDescompYLetras(h, t, u, total, pausaMs=1000){
     };
     speechSynthesis.speak(u1);
   }catch{
-    // Fallback
     speak(`Tienes ${descomp}`); setTimeout(()=>speak(letras), pausaMs);
   }
 }
 
 let challengeNumber = null;
 
-function startChallenge() {
-  challengeNumber = Math.floor(Math.random() * 100) + 1; // 1 a 100
-  document.getElementById("challenge").textContent =
-    `🎯 Forma el número: ${challengeNumber}`;
-  speak(`Forma el número ${numeroALetras.toWords(challengeNumber)}`);
-}
-
 function updateStatus(){
   const { units, tens, hundreds, total } = countAll();
   const enLetras = numEnLetras(total);
 
-  // Estado superior
   const st = document.getElementById("status");
   if (st) {
     st.textContent = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades — (${enLetras})`;
   }
 
-  // Panel de descomposición
   const b = document.getElementById("breakdown");
   if (b){
     b.innerHTML = `
@@ -282,19 +271,13 @@ function updateStatus(){
       <div class="label">En letras</div><div class="value">${enLetras}</div>`;
   }
 
-  // ✅ Comprobación del reto (sin romper el conteo)
+  // ✅ Comprobación del reto
   if (challengeNumber !== null && total === challengeNumber) {
     const ch = document.getElementById('challenge');
     const msg = `🎉 ¡Correcto! Has formado ${enLetras}`;
     if (ch) ch.textContent = msg;
     speak(msg);
-    // Si prefieres que el reto quede completado y se tenga que volver a pulsar:
     challengeNumber = null;
-    // Si prefieres que automáticamente proponga otro, comenta la línea anterior
-    // y descomenta lo siguiente:
-    // challengeNumber = Math.floor(Math.random()*900)+1;
-    // if (ch) ch.textContent = `🎯 Nuevo reto: ${challengeNumber}`;
-    // speak(`Nuevo reto. Forma el número ${numEnLetras(challengeNumber)}`);
   }
 }
 
@@ -303,11 +286,9 @@ function reorderTensZone(){
   if (!zoneTenRect) return;
   const z = ZONES.tens;
   const units = [];
-  pieceLayer.getChildren().forEach(g=>{
-    if (g.getClassName() !== 'Group') return;
+  pieceLayer.find('Group').each(g=>{
     const t = g.name() || g.getAttr('btype');
-    if (t !== 'unit') return;
-    if (centerInZone(g, zoneTenRect)) units.push(g);
+    if (t === 'unit' && centerInZone(g, zoneTenRect)) units.push(g);
   });
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   units.forEach((g,i)=>{
@@ -315,13 +296,13 @@ function reorderTensZone(){
     g.position(snap(z.x + idx*GRID, z.y));
   });
   pieceLayer.batchDraw();
+  updateStatus();
 }
 function reorderHundredsZone(){
   if (!zoneHundRect) return;
   const z = ZONES.hund;
   const tens=[], units=[];
-  pieceLayer.getChildren().forEach(g=>{
-    if (g.getClassName() !== 'Group') return;
+  pieceLayer.find('Group').each(g=>{
     const t = g.name() || g.getAttr('btype');
     if (!centerInZone(g, zoneHundRect)) return;
     if (t==='ten') tens.push(g);
@@ -338,6 +319,7 @@ function reorderHundredsZone(){
     g.position(snap(z.x + col*GRID, z.y + row*GRID));
   });
   pieceLayer.batchDraw();
+  updateStatus();
 }
 
 // ----- Eventos comunes -----
@@ -427,7 +409,7 @@ function composeTensInZone() {
   let changed = false;
 
   const rows = new Map();
-  pieceLayer.getChildren().forEach(n=>{
+  pieceLayer.find('Group').each(n=>{
     const t = n.name()||n.getAttr('btype');
     if (t!=='unit') return;
     if (!centerInZone(n, zoneTenRect)) return;
@@ -454,7 +436,7 @@ function composeTensInZone() {
 
   if (!changed) {
     const pool=[];
-    pieceLayer.getChildren().forEach(n=>{
+    pieceLayer.find('Group').each(n=>{
       const t=n.name()||n.getAttr('btype');
       if (t!=='unit') return;
       if (centerInZone(n, zoneTenRect)) pool.push(n);
@@ -477,7 +459,7 @@ function composeHundredsInZone() {
 
   while (true) {
     const units=[];
-    pieceLayer.getChildren().forEach(n=>{
+    pieceLayer.find('Group').each(n=>{
       const t=n.name()||n.getAttr('btype');
       if (t!=='unit') return;
       if (centerInZone(n, zoneHundRect)) units.push(n);
@@ -491,7 +473,7 @@ function composeHundredsInZone() {
 
   while (true) {
     const tens=[];
-    pieceLayer.getChildren().forEach(n=>{
+    pieceLayer.find('Group').each(n=>{
       const t=n.name()||n.getAttr('btype');
       if (t!=='ten') return;
       if (centerInZone(n, zoneHundRect)) tens.push(n);
@@ -533,15 +515,17 @@ function wireUI(){
   $('btn-say')?.addEventListener('click', ()=>{
     const {units,tens,hundreds,total}=countAll();
     if (total === 0) return;
-    hablarDescompYLetras(hundreds, tens, units, total, 1100); // ~1.1s de pausa
+    hablarDescompYLetras(hundreds, tens, units, total, 1100);
   });
 
- $('btn-challenge')?.addEventListener('click', ()=>{
-  challengeNumber = Math.floor(Math.random()*900)+1; // 1..900 (ajusta si quieres otro rango)
-  const ch = document.getElementById('challenge');
-  if (ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
-  speak(`Forma el número ${numEnLetras(challengeNumber)}`);
-});
+  // 🎯 Reto
+  $('btn-challenge')?.addEventListener('click', ()=>{
+    challengeNumber = Math.floor(Math.random()*900)+1; // 1..900
+    const ch = document.getElementById('challenge');
+    if (ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
+    speak(`Forma el número ${numEnLetras(challengeNumber)}`);
+  });
+
   $('panel-toggle')?.addEventListener('click', ()=>{
     const panel=$('panel');
     const open=panel.classList.toggle('open');
