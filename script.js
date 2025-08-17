@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.1: 3 Layers + pan/zoom sincronizado + fix ZONES) =====
-console.log("Bloques v16.1");
+// ===== Bloques — script.js (v16.2: 3 Layers + pan/zoom sincronizado + fix ZONES) =====
+console.log("Bloques v16.2");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -24,7 +24,7 @@ const CHIP_STYLE = {
 const WORLD_COLS = 160;
 const WORLD_ROWS = 120;
 
-// ----- Stage y Layers -----
+// ----- Stage y Layers (sin meter Layers dentro de Groups) -----
 const stage = new Konva.Stage({
   container: "container",
   width: window.innerWidth,
@@ -77,8 +77,11 @@ function speak(text){
   try{ const u=new SpeechSynthesisUtterance(text); u.lang="es-ES"; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{}
 }
 
-// get bounding box ABSOLUTO
-function nodeBoxAbs(n){ const r = n.getClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }
+// get bounding box ABSOLUTO (todas las layers comparten transf.)
+function nodeBoxAbs(n){
+  const r = n.getClientRect(); // absoluto (incluye pan/zoom)
+  return { x: r.x, y: r.y, w: r.width, h: r.height };
+}
 function isInsideZone(node, zoneRect){
   const b = nodeBoxAbs(node);
   const z = nodeBoxAbs(zoneRect);
@@ -88,7 +91,7 @@ function isInsideZone(node, zoneRect){
 }
 
 // ----- Zonas 1×10 y 10×10 -----
-let ZONES = null;
+let ZONES = null;           // <— ÚNICA declaración
 let zoneTenRect = null;
 let zoneHundRect = null;
 
@@ -158,7 +161,7 @@ function onDouble(group, cb){
   group.on('click',       ()=>{ const now=Date.now(); if(now-lastClick<300) cb(); lastClick=now; });
 }
 
-// ----- Piezas -----
+// ----- Piezas (cada pieza = Group con Rect hijo) -----
 function addChipRectTo(group, w, h, fill){
   const rect = new Konva.Rect({ x: 0, y: 0, width: w, height: h, fill, ...CHIP_STYLE });
   group.add(rect);
@@ -207,9 +210,97 @@ function createHundred(x,y){
   return g;
 }
 
-// ----- Construcción en zonas -----
-function composeTensInZone() { /* igual que antes */ }
-function composeHundredsInZone() { /* igual que antes */ }
+// ----- ZONAS de construcción -----
+function composeTensInZone() {
+  if (!zoneTenRect) return false;
+  let changed = false;
+
+  // Mapa de filas dentro de la zona (UNIDADES)
+  const rows = new Map();
+  pieceLayer.getChildren().forEach(n=>{
+    const t = n.name()||n.getAttr('btype');
+    if (t!=='unit') return;
+    if (!isInsideZone(n, zoneTenRect)) return;
+    const rowY = toCell(n.y());
+    if (!rows.has(rowY)) rows.set(rowY, new Map());
+    rows.get(rowY).set(toCell(n.x()), n);
+  });
+
+  // Buscar 10 contiguas
+  rows.forEach((mapX, rowY)=>{
+    const xs = Array.from(mapX.keys()).sort((a,b)=>a-b);
+    for (let i=0; i<=xs.length-10; i++){
+      let ok=true;
+      for (let k=0;k<10;k++){
+        if (!mapX.has(xs[i]+k*GRID)) { ok=false; break; }
+      }
+      if (ok){
+        const nodes=[]; for (let k=0;k<10;k++) nodes.push(mapX.get(xs[i]+k*GRID));
+        nodes.forEach(n=>n.destroy());
+        createTen(xs[i], rowY);
+        changed = true;
+      }
+    }
+  });
+
+  // Si no hay 10 contiguas, 10 cualesquiera dentro
+  if (!changed) {
+    const pool=[];
+    pieceLayer.getChildren().forEach(n=>{
+      const t=n.name()||n.getAttr('btype');
+      if (t!=='unit') return;
+      if (isInsideZone(n, zoneTenRect)) pool.push(n);
+    });
+    if (pool.length>=10){
+      const anchor = snap(pool[0].x(), pool[0].y());
+      for (let i=0;i<10;i++) pool[i].destroy();
+      createTen(anchor.x, anchor.y);
+      changed = true;
+    }
+  }
+
+  if (changed) pieceLayer.draw();
+  return changed;
+}
+
+function composeHundredsInZone() {
+  if (!zoneHundRect) return false;
+  let changed = false;
+
+  // Unidades -> Decenas (tantas como se pueda)
+  while (true) {
+    const units=[];
+    pieceLayer.getChildren().forEach(n=>{
+      const t=n.name()||n.getAttr('btype');
+      if (t!=='unit') return;
+      if (isInsideZone(n, zoneHundRect)) units.push(n);
+    });
+    if (units.length < 10) break;
+    const anchor = snap(units[0].x(), units[0].y());
+    for (let i=0;i<10;i++) units[i].destroy();
+    createTen(anchor.x, anchor.y);
+    changed = true;
+  }
+
+  // Decenas -> Centena (tantas como se pueda)
+  while (true) {
+    const tens=[];
+    pieceLayer.getChildren().forEach(n=>{
+      const t=n.name()||n.getAttr('btype');
+      if (t!=='ten') return;
+      if (isInsideZone(n, zoneHundRect)) tens.push(n);
+    });
+    if (tens.length < 10) break;
+    const anchor = snap(tens[0].x(), tens[0].y());
+    for (let i=0;i<10;i++) tens[i].destroy();
+    createHundred(anchor.x, anchor.y);
+    changed = true;
+  }
+
+  if (changed) pieceLayer.draw();
+  return changed;
+}
+
 function checkBuildZones() {
   let changed;
   do {
@@ -221,10 +312,78 @@ function checkBuildZones() {
 }
 
 // ----- Botonera -----
-function wireUI(){ /* igual que antes */ }
+function wireUI(){
+  const $ = id => document.getElementById(id);
+  $('btn-unit')   ?.addEventListener('click', ()=>{ const c=centerWorld(); createUnit(c.x,c.y); });
+  $('btn-ten')    ?.addEventListener('click', ()=>{ const c=centerWorld(); createTen(c.x-5*GRID,c.y); });
+  $('btn-hundred')?.addEventListener('click', ()=>{ const c=centerWorld(); createHundred(c.x-5*GRID,c.y-5*GRID); });
+  $('btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); });
+  $('btn-compose')?.addEventListener('click', ()=>{ checkBuildZones(); });
+  $('btn-say')    ?.addEventListener('click', ()=>{
+    const {units,tens,hundreds,total}=countAll();
+    speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}.`);
+  });
+  $('btn-challenge')?.addEventListener('click', ()=>{
+    const n=Math.floor(Math.random()*900)+100;
+    const ch=$('challenge'); if (ch) ch.textContent=`Forma el número ${n}`;
+  });
+  $('panel-toggle')?.addEventListener('click', ()=>{
+    const panel=$('panel');
+    const open=panel.classList.toggle('open');
+    const btn=$('panel-toggle');
+    btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
+    btn.setAttribute('aria-expanded', String(open));
+    panel.setAttribute('aria-hidden', String(!open));
+  });
+}
 
-// ----- Pan & Zoom -----
-/* ... igual que tu v16 ... */
+// ----- Pan & Zoom (sin Groups padres; sincronizamos las 3 layers) -----
+let isPanning = false;
+let lastPointerPos = null;
+
+stage.on('mousedown touchstart', (e)=>{
+  // Evitar pan si el objetivo está en la capa de piezas (arrastras una ficha)
+  if (e.target && e.target.getLayer && e.target.getLayer() === pieceLayer) return;
+  isPanning = true;
+  lastPointerPos = stage.getPointerPosition();
+});
+stage.on('mousemove touchmove', ()=>{
+  if (!isPanning) return;
+  const pos = stage.getPointerPosition();
+  if (!pos || !lastPointerPos) return;
+  const dx = pos.x - lastPointerPos.x;
+  const dy = pos.y - lastPointerPos.y;
+  world.x += dx;
+  world.y += dy;
+  applyWorldTransform();
+  lastPointerPos = pos;
+});
+stage.on('mouseup touchend', ()=>{ isPanning = false; lastPointerPos = null; });
+
+const SCALE_MIN = 0.4, SCALE_MAX = 3.0, SCALE_BY = 1.06;
+stage.on('wheel', (e)=>{
+  e.evt.preventDefault();
+  const old = world.scale;
+  const pointer = stage.getPointerPosition();
+  const mouse = { x: (pointer.x - world.x) / old, y: (pointer.y - world.y) / old };
+  const dir = e.evt.deltaY > 0 ? -1 : 1;
+  let s = dir > 0 ? old * SCALE_BY : old / SCALE_BY;
+  s = Math.max(SCALE_MIN, Math.min(SCALE_MAX, s));
+  world.scale = s;
+  world.x = pointer.x - mouse.x * s;
+  world.y = pointer.y - mouse.y * s;
+  applyWorldTransform();
+});
+stage.on('dblclick dbltap', ()=>{
+  const pointer = stage.getPointerPosition();
+  const old = world.scale;
+  const mouse = { x: (pointer.x - world.x) / old, y: (pointer.y - world.y) / old };
+  let s = Math.min(SCALE_MAX, old * 1.25);
+  world.scale = s;
+  world.x = pointer.x - mouse.x * s;
+  world.y = pointer.y - mouse.y * s;
+  applyWorldTransform();
+});
 
 // ----- Resize & arranque -----
 function relayout(){
