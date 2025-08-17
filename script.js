@@ -4,7 +4,7 @@ const UNIT_SIZE = GRID;
 const COLORS = { unit: "blue", ten: "red", hundred: "green" };
 const GRID_COLOR = "#c7c7c7";
 const DOUBLE_TAP_MS = 300;
-Konva.pixelRatio = 1; // evitar HiDPI raro
+Konva.pixelRatio = 1;
 
 // ===== Stage y capas =====
 const stage = new Konva.Stage({
@@ -51,7 +51,8 @@ function countAll(){
 }
 function updateStatus(){
   const {units,tens,hundreds,total}=countAll();
-  document.getElementById("status").innerText = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
+  document.getElementById("status").innerText =
+    `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
   const b=document.getElementById("breakdown");
   if(b){
     b.innerHTML = `
@@ -76,7 +77,6 @@ function addDoubleTapHandler(shape, onDT){
   shape.on("click", ()=>{ const now=Date.now(); if(now-lastClick<DOUBLE_TAP_MS) onDT(); lastClick=now; });
 }
 
-// ===== Piezas =====
 function createUnit(x,y){
   const p=snapToGrid(x,y);
   const rect=new Konva.Rect({ x:p.x,y:p.y,width:UNIT_SIZE,height:UNIT_SIZE,fill:COLORS.unit,draggable:true,strokeEnabled:false });
@@ -203,27 +203,22 @@ function togglePanel(){
   panel.setAttribute("aria-hidden", String(!open));
 }
 
-// ===== Enlazar botones SIN onclick inline =====
-function wireUI(){
-  document.getElementById("btn-unit").addEventListener("click", ()=>{ const c=centerPos(); createUnit(c.x,c.y); });
-  document.getElementById("btn-ten").addEventListener("click",  ()=>{ const c=centerPos(); createTen(c.x-5*GRID,c.y); });
-  document.getElementById("btn-hundred").addEventListener("click", ()=>{ const c=centerPos(); createHundred(c.x-5*GRID,c.y-5*GRID); });
-  document.getElementById("btn-clear").addEventListener("click", clearAll);
-  document.getElementById("btn-compose").addEventListener("click", autoCompose);
-  document.getElementById("btn-say").addEventListener("click", sayCurrent);
-  document.getElementById("btn-challenge").addEventListener("click", newChallenge);
-  document.getElementById("panel-toggle").addEventListener("click", togglePanel);
-}
-function clearAll(){ layer.destroyChildren(); layer.draw(); updateStatus(); }
-function sayCurrent(){ const {units,tens,hundreds,total}=countAll(); speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}.`); }
-function newChallenge(){ const target=Math.floor(Math.random()*900)+100; const el=document.getElementById("challenge"); el.textContent=`Forma el número ${target}`; speak(`Reto: forma el número ${target}`); }
+// ===== Enlazar botones (ejecutado inmediatamente porque usamos 'defer') =====
+(function wireUI(){
+  const $ = (id) => document.getElementById(id);
+  $("btn-unit").addEventListener("click", ()=>{ const c=centerPos(); createUnit(c.x,c.y); });
+  $("btn-ten").addEventListener("click",  ()=>{ const c=centerPos(); createTen(c.x-5*GRID,c.y); });
+  $("btn-hundred").addEventListener("click", ()=>{ const c=centerPos(); createHundred(c.x-5*GRID,c.y-5*GRID); });
+  $("btn-clear").addEventListener("click", ()=>{ layer.destroyChildren(); layer.draw(); updateStatus(); });
+  $("btn-compose").addEventListener("click", autoCompose);
+  $("btn-say").addEventListener("click", ()=>{ const {units,tens,hundreds,total}=countAll(); speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}.`); });
+  $("btn-challenge").addEventListener("click", ()=>{ const target=Math.floor(Math.random()*900)+100; $("challenge").textContent=`Forma el número ${target}`; speak(`Reto: forma el número ${target}`); });
+  $("panel-toggle").addEventListener("click", togglePanel);
+  console.log("UI conectada ✅");
+})();
 
-// ===== Resize y arranque =====
+// ===== Resize & arranque =====
 function resize(){ stage.width(window.innerWidth); stage.height(window.innerHeight); drawGrid(); layer.draw(); }
-
 window.addEventListener("resize", resize);
-window.addEventListener("DOMContentLoaded", ()=>{
-  drawGrid();
-  wireUI();       // 👈 ahora sí conectamos los botones
-  updateStatus();
-});
+drawGrid();
+updateStatus();
