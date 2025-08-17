@@ -261,30 +261,40 @@ function startChallenge() {
   speak(`Forma el número ${numeroALetras.toWords(challengeNumber)}`);
 }
 
-function updateStatus() {
-  const units = countUnits();
-  const tens = countTens();
-  const hundreds = countHundreds();
-  const total = units + tens * 10 + hundreds * 100;
+function updateStatus(){
+  const { units, tens, hundreds, total } = countAll();
+  const enLetras = numEnLetras(total);
 
-  document.getElementById("status").textContent =
-    `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
+  // Estado superior
+  const st = document.getElementById("status");
+  if (st) {
+    st.textContent = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades — (${enLetras})`;
+  }
 
-  // Actualizamos breakdown
-  const breakdown = document.getElementById("breakdown");
-  breakdown.innerHTML = `
-    <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
-    <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
-    <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
-    <div class="label">Total</div><div class="value">${total}</div>
-  `;
+  // Panel de descomposición
+  const b = document.getElementById("breakdown");
+  if (b){
+    b.innerHTML = `
+      <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
+      <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
+      <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
+      <div class="label">Total</div><div class="value">${total}</div>
+      <div class="label">En letras</div><div class="value">${enLetras}</div>`;
+  }
 
-  // --- Nuevo: comprobar reto ---
+  // ✅ Comprobación del reto (sin romper el conteo)
   if (challengeNumber !== null && total === challengeNumber) {
-    const msg = `🎉 ¡Correcto! Has formado ${numeroALetras.toWords(total)}`;
-    document.getElementById("challenge").textContent = msg;
+    const ch = document.getElementById('challenge');
+    const msg = `🎉 ¡Correcto! Has formado ${enLetras}`;
+    if (ch) ch.textContent = msg;
     speak(msg);
-    challengeNumber = null; // desactivar reto actual
+    // Si prefieres que el reto quede completado y se tenga que volver a pulsar:
+    challengeNumber = null;
+    // Si prefieres que automáticamente proponga otro, comenta la línea anterior
+    // y descomenta lo siguiente:
+    // challengeNumber = Math.floor(Math.random()*900)+1;
+    // if (ch) ch.textContent = `🎯 Nuevo reto: ${challengeNumber}`;
+    // speak(`Nuevo reto. Forma el número ${numEnLetras(challengeNumber)}`);
   }
 }
 
@@ -526,10 +536,12 @@ function wireUI(){
     hablarDescompYLetras(hundreds, tens, units, total, 1100); // ~1.1s de pausa
   });
 
-  $('btn-challenge')?.addEventListener('click', ()=>{
-    const n=Math.floor(Math.random()*900)+100;
-    const ch=$('challenge'); if (ch) ch.textContent=`Forma el número ${n}`;
-  });
+ $('btn-challenge')?.addEventListener('click', ()=>{
+  challengeNumber = Math.floor(Math.random()*900)+1; // 1..900 (ajusta si quieres otro rango)
+  const ch = document.getElementById('challenge');
+  if (ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
+  speak(`Forma el número ${numEnLetras(challengeNumber)}`);
+});
   $('panel-toggle')?.addEventListener('click', ()=>{
     const panel=$('panel');
     const open=panel.classList.toggle('open');
