@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.8.1: conteo robusto + limpieza) =====
-console.log("Bloques v16.8.1");
+// ===== Bloques — script.js (v16.8.2: conteo robusto desde stage) =====
+console.log("Bloques v16.8.2");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -40,9 +40,8 @@ stage.add(gridLayer);
 stage.add(uiLayer);
 stage.add(pieceLayer);
 
-// Transformación global (pan/zoom) aplicada a TODAS las layers
+// Transformación global (pan/zoom)
 const world = { x: 0, y: 0, scale: 1 };
-
 function applyWorldTransform() {
   [gridLayer, uiLayer, pieceLayer].forEach(L => {
     L.position({ x: world.x, y: world.y });
@@ -51,13 +50,8 @@ function applyWorldTransform() {
   stage.batchDraw();
 }
 
-// === Conversión pantalla ⇄ mundo (con tu pan/zoom)
-function screenToWorld(pt){
-  return {
-    x: (pt.x - world.x) / world.scale,
-    y: (pt.y - world.y) / world.scale
-  };
-}
+// === Conversión pantalla ⇄ mundo
+function screenToWorld(pt){ return { x:(pt.x-world.x)/world.scale, y:(pt.y-world.y)/world.scale }; }
 function visibleWorldRect(){
   const tl = screenToWorld({ x: 0, y: 0 });
   const br = screenToWorld({ x: stage.width(), y: stage.height() });
@@ -87,7 +81,7 @@ function zoomAt(pointer, targetScale){
   world.y = pointer.y - mouse.y * s;
   applyWorldTransform();
 }
-function zoomStep(direction){ // +1 in / -1 out
+function zoomStep(direction){
   const factor = direction > 0 ? SCALE_BY : 1 / SCALE_BY;
   const target = world.scale * factor;
   const center = { x: stage.width() / 2, y: stage.height() / 2 };
@@ -97,46 +91,26 @@ function zoomStep(direction){ // +1 in / -1 out
 // ----- Cuadrícula -----
 function drawGrid() {
   gridLayer.destroyChildren();
-  const W = WORLD_COLS * GRID;
-  const H = WORLD_ROWS * GRID;
-
-  gridLayer.add(new Konva.Rect({
-    x: 0, y: 0, width: W, height: H,
-    stroke: "#dddddd", strokeWidth: 2, listening: false
-  }));
-
-  for (let x = 0; x <= W; x += GRID) {
-    const X = x + 0.5;
-    gridLayer.add(new Konva.Line({ points: [X,0,X,H], stroke: "#e5e5e5", strokeWidth: 1, listening: false }));
-  }
-  for (let y = 0; y <= H; y += GRID) {
-    const Y = y + 0.5;
-    gridLayer.add(new Konva.Line({ points: [0,Y,W,Y], stroke: "#e5e5e5", strokeWidth: 1, listening: false }));
-  }
+  const W = WORLD_COLS * GRID, H = WORLD_ROWS * GRID;
+  gridLayer.add(new Konva.Rect({ x: 0, y: 0, width: W, height: H, stroke: "#dddddd", strokeWidth: 2, listening: false }));
+  for (let x = 0; x <= W; x += GRID) gridLayer.add(new Konva.Line({ points:[x+0.5,0,x+0.5,H], stroke:"#e5e5e5", strokeWidth:1, listening:false }));
+  for (let y = 0; y <= H; y += GRID) gridLayer.add(new Konva.Line({ points:[0,y+0.5,W,y+0.5], stroke:"#e5e5e5", strokeWidth:1, listening:false }));
   gridLayer.draw();
 }
 
 // ----- Utils -----
-const toCell = (n) => Math.round(n / GRID) * GRID;
+const toCell = n => Math.round(n / GRID) * GRID;
 const snap   = (x,y)=>({x:toCell(x), y:toCell(y)});
 function speak(text){
-  try{
-    const u=new SpeechSynthesisUtterance(text);
-    u.lang="es-ES";
-    speechSynthesis.cancel();
-    speechSynthesis.speak(u);
-  }catch{}
+  try{ const u=new SpeechSynthesisUtterance(text); u.lang="es-ES"; speechSynthesis.cancel(); speechSynthesis.speak(u); }catch{}
 }
 
 // ==== Geometría de zona ====
-function nodeBoxAbs(n){ const r = n.getClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }
-function rectsIntersect(a,b){
-  return !(a.x + a.w <= b.x || a.x >= b.x + b.w || a.y + a.h <= b.y || a.y >= b.y + b.h);
-}
+function nodeBoxAbs(n){ const r=n.getClientRect(); return {x:r.x,y:r.y,w:r.width,h:r.height}; }
+function rectsIntersect(a,b){ return !(a.x+a.w<=b.x || a.x>=b.x+b.w || a.y+a.h<=b.y || a.y>=b.y+b.h); }
 function intersectsZone(node, zoneRect){ return rectsIntersect(nodeBoxAbs(node), nodeBoxAbs(zoneRect)); }
 function centerInZone(node, zoneRect){
-  const b = nodeBoxAbs(node);
-  const z = nodeBoxAbs(zoneRect);
+  const b = nodeBoxAbs(node), z = nodeBoxAbs(zoneRect);
   const cx = b.x + b.w/2, cy = b.y + b.h/2;
   return (cx >= z.x && cx <= z.x+z.w && cy >= z.y && cy <= z.y+z.h);
 }
@@ -155,30 +129,34 @@ function computeZones() {
 function drawZones() {
   uiLayer.destroyChildren();
   const { tens, hund } = ZONES;
-
   zoneTenRect = new Konva.Rect({ x:tens.x, y:tens.y, width:tens.w, height:tens.h, stroke: ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill: ZONE_FILL, listening:false });
   const tenLbl = new Konva.Text({ x:tens.x+6, y:tens.y-22, text:tens.label, fontSize:16, fill: ZONE_STROKE, listening:false });
   zoneHundRect = new Konva.Rect({ x:hund.x, y:hund.y, width:hund.w, height:hund.h, stroke: ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill: ZONE_FILL, listening:false });
   const hundLbl = new Konva.Text({ x:hund.x+6, y:hund.y-22, text:hund.label, fontSize:16, fill: ZONE_STROKE, listening:false });
-
-  uiLayer.add(zoneTenRect);
-  uiLayer.add(tenLbl);
-  uiLayer.add(zoneHundRect);
-  uiLayer.add(hundLbl);
+  uiLayer.add(zoneTenRect, tenLbl, zoneHundRect, hundLbl);
   uiLayer.draw();
 }
 
+// ----- Helpers de piezas (robusto) -----
+function getPieceGroups(){
+  const out = [];
+  stage.find('Group').each(g=>{
+    const t = g.name && g.name() || g.getAttr && g.getAttr('btype');
+    if (t === 'unit' || t === 'ten' || t === 'hundred') out.push(g);
+  });
+  return out;
+}
+
 // ----- Contador + descomposición -----
-// ✅ Más robusto: usa el selector de Konva y no asume hijos directos
 function countAll(){
   let units=0, tens=0, hundreds=0;
-  const groups = pieceLayer.find('Group'); // todos los grupos (piezas)
-  groups.each(n=>{
+  const groups = getPieceGroups();
+  for (const n of groups){
     const t = n.name() || n.getAttr('btype');
     if (t==='unit') units++;
     else if (t==='ten') tens++;
     else if (t==='hundred') hundreds++;
-  });
+  }
   return { units, tens, hundreds, total: units + 10*tens + 100*hundreds };
 }
 
@@ -186,68 +164,28 @@ function countAll(){
 function numEnLetras(n){
   n = Math.floor(Number(n) || 0);
   if (n === 0) return 'cero';
-
-  const U = ['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve',
-             'diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte',
-             'veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
-  const T = ['','diez','veinte','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
-  const C = ['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
-
-  function _0_99(x){
-    if (x < 30) return U[x];
-    const d = Math.floor(x/10), u = x%10;
-    if (u === 0) return T[d];
-    if (d === 2) return 'veinti' + U[u];
-    return T[d] + ' y ' + U[u];
-  }
-  function _0_999(x){
-    if (x === 100) return 'cien';
-    const c = Math.floor(x/100), r = x%100;
-    if (c === 0) return _0_99(r);
-    if (r === 0) return C[c];
-    return C[c] + ' ' + _0_99(r);
-  }
-  if (n < 1000) return _0_999(n);
-  if (n < 1000000){
-    const miles = Math.floor(n/1000), r = n%1000;
-    const milesTxt = (miles === 1) ? 'mil' : _0_999(miles) + ' mil';
-    if (r === 0) return milesTxt;
-    return milesTxt + ' ' + _0_999(r);
-  }
+  const U=['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+  const T=['','diez','veinte','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const C=['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+  function _0_99(x){ if(x<30)return U[x]; const d=Math.floor(x/10),u=x%10; if(u===0)return T[d]; if(d===2)return 'veinti'+U[u]; return T[d]+' y '+U[u]; }
+  function _0_999(x){ if(x===100)return 'cien'; const c=Math.floor(x/100),r=x%100; if(c===0)return _0_99(r); if(r===0)return C[c]; return C[c]+' '+_0_99(r); }
+  if (n<1000) return _0_999(n);
+  if (n<1_000_000){ const miles=Math.floor(n/1000),r=n%1000; const m=(miles===1)?'mil':_0_999(miles)+' mil'; return r===0?m:m+' '+_0_999(r); }
   return String(n);
 }
 
-// ---- Frase de voz en 2 pasos (descomposición -> pausa -> número en letras) ----
-function hablarDescompYLetras(h, t, u, total, pausaMs=1000){
-  const partes = [];
-  if (h > 0) partes.push(`${h} ${h === 1 ? 'centena' : 'centenas'}`);
-  if (t > 0) partes.push(`${t} ${t === 1 ? 'decena' : 'decenas'}`);
-  if (u > 0) partes.push(`${u} ${u === 1 ? 'unidad' : 'unidades'}`);
-
-  const letras = numEnLetras(total);
-
-  if (partes.length === 0) { speak(letras); return; }
-
-  let descomp = '';
-  if (partes.length === 1) descomp = partes[0];
-  else if (partes.length === 2) descomp = partes.join(' y ');
-  else descomp = partes.slice(0, -1).join(', ') + ' y ' + partes.slice(-1);
-
+// ---- Voz en 2 pasos ----
+function hablarDescompYLetras(h,t,u,total,pausaMs=1000){
+  const partes=[]; if(h>0)partes.push(`${h} ${h===1?'centena':'centenas'}`); if(t>0)partes.push(`${t} ${t===1?'decena':'decenas'}`); if(u>0)partes.push(`${u} ${u===1?'unidad':'unidades'}`);
+  const letras=numEnLetras(total);
+  if (partes.length===0){ speak(letras); return; }
+  let descomp = partes.length===1 ? partes[0] : (partes.length===2 ? partes.join(' y ') : partes.slice(0,-1).join(', ')+' y '+partes.slice(-1));
   try{
     speechSynthesis.cancel();
-    const u1 = new SpeechSynthesisUtterance(`Tienes ${descomp}`);
-    u1.lang = 'es-ES';
-    u1.onend = () => {
-      setTimeout(() => {
-        const u2 = new SpeechSynthesisUtterance(letras);
-        u2.lang = 'es-ES';
-        speechSynthesis.speak(u2);
-      }, pausaMs);
-    };
+    const u1=new SpeechSynthesisUtterance(`Tienes ${descomp}`); u1.lang='es-ES';
+    u1.onend=()=>{ setTimeout(()=>{ const u2=new SpeechSynthesisUtterance(letras); u2.lang='es-ES'; speechSynthesis.speak(u2); }, pausaMs); };
     speechSynthesis.speak(u1);
-  }catch{
-    speak(`Tienes ${descomp}`); setTimeout(()=>speak(letras), pausaMs);
-  }
+  }catch{ speak(`Tienes ${descomp}`); setTimeout(()=>speak(letras), pausaMs); }
 }
 
 let challengeNumber = null;
@@ -256,12 +194,10 @@ function updateStatus(){
   const { units, tens, hundreds, total } = countAll();
   const enLetras = numEnLetras(total);
 
-  const st = document.getElementById("status");
-  if (st) {
-    st.textContent = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades — (${enLetras})`;
-  }
+  const st=document.getElementById("status");
+  if (st) st.textContent = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades — (${enLetras})`;
 
-  const b = document.getElementById("breakdown");
+  const b=document.getElementById("breakdown");
   if (b){
     b.innerHTML = `
       <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
@@ -271,7 +207,6 @@ function updateStatus(){
       <div class="label">En letras</div><div class="value">${enLetras}</div>`;
   }
 
-  // ✅ Comprobación del reto
   if (challengeNumber !== null && total === challengeNumber) {
     const ch = document.getElementById('challenge');
     const msg = `🎉 ¡Correcto! Has formado ${enLetras}`;
@@ -281,20 +216,17 @@ function updateStatus(){
   }
 }
 
-// ======= AUTO-ORDENACIÓN EN ZONAS =======
+// ======= AUTO-ORDENACIÓN =======
 function reorderTensZone(){
   if (!zoneTenRect) return;
   const z = ZONES.tens;
   const units = [];
-  pieceLayer.find('Group').each(g=>{
-    const t = g.name() || g.getAttr('btype');
-    if (t === 'unit' && centerInZone(g, zoneTenRect)) units.push(g);
+  getPieceGroups().forEach(g=>{
+    const t=g.name()||g.getAttr('btype');
+    if (t==='unit' && centerInZone(g, zoneTenRect)) units.push(g);
   });
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
-  units.forEach((g,i)=>{
-    const idx = Math.min(i,9);
-    g.position(snap(z.x + idx*GRID, z.y));
-  });
+  units.forEach((g,i)=>{ g.position(snap(z.x + Math.min(i,9)*GRID, z.y)); });
   pieceLayer.batchDraw();
   updateStatus();
 }
@@ -302,22 +234,16 @@ function reorderHundredsZone(){
   if (!zoneHundRect) return;
   const z = ZONES.hund;
   const tens=[], units=[];
-  pieceLayer.find('Group').each(g=>{
-    const t = g.name() || g.getAttr('btype');
+  getPieceGroups().forEach(g=>{
+    const t=g.name()||g.getAttr('btype');
     if (!centerInZone(g, zoneHundRect)) return;
-    if (t==='ten') tens.push(g);
-    else if (t==='unit') units.push(g);
+    if (t==='ten') tens.push(g); else if (t==='unit') units.push(g);
   });
   tens.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
-
   tens.forEach((g,i)=>{ g.position(snap(z.x, z.y + i*GRID)); });
-  const startRow = tens.length;
-  units.forEach((g,i)=>{
-    const row = startRow + Math.floor(i/10);
-    const col = i % 10;
-    g.position(snap(z.x + col*GRID, z.y + row*GRID));
-  });
+  const startRow=tens.length;
+  units.forEach((g,i)=>{ const row=startRow+Math.floor(i/10), col=i%10; g.position(snap(z.x+col*GRID, z.y+row*GRID)); });
   pieceLayer.batchDraw();
   updateStatus();
 }
@@ -327,16 +253,11 @@ function onDragEnd(group){
   group.on("dragend", ()=>{
     group.position(snap(group.x(), group.y()));
     const type = group.name() || group.getAttr('btype');
-
     if (zoneTenRect && type==='unit' && intersectsZone(group, zoneTenRect)) {
-      group.position(snap(ZONES.tens.x, ZONES.tens.y));
-      reorderTensZone();
-      checkBuildZones();
+      group.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); checkBuildZones();
     }
     if (zoneHundRect && (type==='unit' || type==='ten') && intersectsZone(group, zoneHundRect)) {
-      group.position(snap(ZONES.hund.x, ZONES.hund.y));
-      reorderHundredsZone();
-      checkBuildZones();
+      group.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); checkBuildZones();
     }
     pieceLayer.draw();
     updateStatus();
@@ -344,155 +265,85 @@ function onDragEnd(group){
 }
 function onDouble(group, cb){
   let lastTap=0, lastClick=0;
-  group.on('dbltap', cb);
-  group.on('dblclick', cb);
+  group.on('dbltap', cb); group.on('dblclick', cb);
   group.on('pointerdown', ()=>{ const now=Date.now(); if(now-lastTap<300) cb(); lastTap=now; });
   group.on('click',       ()=>{ const now=Date.now(); if(now-lastClick<300) cb(); lastClick=now; });
 }
 
 // ----- Piezas -----
 function addChipRectTo(group, w, h, fill){
-  const rect = new Konva.Rect({ x: 0, y: 0, width: w, height: h, fill, ...CHIP_STYLE });
+  const rect = new Konva.Rect({ x:0, y:0, width:w, height:h, fill, ...CHIP_STYLE });
   group.add(rect);
   return rect;
 }
 function createUnit(x,y){
-  const g = new Konva.Group({ x: toCell(x), y: toCell(y), draggable:true, name:'unit' });
-  g.setAttr('btype','unit');
-  addChipRectTo(g, GRID, GRID, COLORS.unit);
-  onDragEnd(g);
+  const g=new Konva.Group({ x:toCell(x), y:toCell(y), draggable:true, name:'unit' });
+  g.setAttr('btype','unit'); addChipRectTo(g, GRID, GRID, COLORS.unit); onDragEnd(g);
   pieceLayer.add(g); pieceLayer.draw();
-
   if (zoneTenRect && intersectsZone(g, zoneTenRect)) { g.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); }
   if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
-
-  checkBuildZones(); updateStatus();
-  return g;
+  checkBuildZones(); updateStatus(); return g;
 }
 function createTen(x,y){
-  const g = new Konva.Group({ x: toCell(x), y: toCell(y), draggable:true, name:'ten' });
-  g.setAttr('btype','ten');
-  addChipRectTo(g, 10*GRID, GRID, COLORS.ten);
-  onDragEnd(g);
-  onDouble(g, ()=>{
-    const start = snap(g.x(), g.y());
-    g.destroy();
-    for (let k=0;k<10;k++) createUnit(start.x + k*GRID, start.y);
-    pieceLayer.draw(); checkBuildZones(); updateStatus();
-  });
+  const g=new Konva.Group({ x:toCell(x), y:toCell(y), draggable:true, name:'ten' });
+  g.setAttr('btype','ten'); addChipRectTo(g, 10*GRID, GRID, COLORS.ten); onDragEnd(g);
+  onDouble(g, ()=>{ const start=snap(g.x(), g.y()); g.destroy(); for(let k=0;k<10;k++) createUnit(start.x + k*GRID, start.y); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
   pieceLayer.add(g); pieceLayer.draw();
-
-  if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
-
-  checkBuildZones(); updateStatus();
-  return g;
+  if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.h.y)); reorderHundredsZone(); }
+  checkBuildZones(); updateStatus(); return g;
 }
 function createHundred(x,y){
-  const g = new Konva.Group({ x: toCell(x), y: toCell(y), draggable:true, name:'hundred' });
-  g.setAttr('btype','hundred');
-  addChipRectTo(g, 10*GRID, 10*GRID, COLORS.hundred);
-  onDragEnd(g);
-  onDouble(g, ()=>{
-    const start = snap(g.x(), g.y());
-    g.destroy();
-    for (let row=0; row<10; row++) createTen(start.x, start.y + row*GRID);
-    pieceLayer.draw(); checkBuildZones(); updateStatus();
-  });
-  pieceLayer.add(g); pieceLayer.draw();
-  checkBuildZones(); updateStatus();
-  return g;
+  const g=new Konva.Group({ x:toCell(x), y:toCell(y), draggable:true, name:'hundred' });
+  g.setAttr('btype','hundred'); addChipRectTo(g, 10*GRID, 10*GRID, COLORS.hundred); onDragEnd(g);
+  onDouble(g, ()=>{ const start=snap(g.x(), g.y()); g.destroy(); for(let row=0; row<10; row++) createTen(start.x, start.y + row*GRID); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
+  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
 
 // ----- ZONAS de composición -----
 function composeTensInZone() {
   if (!zoneTenRect) return false;
   let changed = false;
-
   const rows = new Map();
-  pieceLayer.find('Group').each(n=>{
+  getPieceGroups().forEach(n=>{
     const t = n.name()||n.getAttr('btype');
-    if (t!=='unit') return;
-    if (!centerInZone(n, zoneTenRect)) return;
+    if (t!=='unit' || !centerInZone(n, zoneTenRect)) return;
     const rowY = toCell(n.y());
     if (!rows.has(rowY)) rows.set(rowY, new Map());
     rows.get(rowY).set(toCell(n.x()), n);
   });
-
   rows.forEach((mapX, rowY)=>{
     const xs = Array.from(mapX.keys()).sort((a,b)=>a-b);
     for (let i=0; i<=xs.length-10; i++){
-      let ok=true;
-      for (let k=0;k<10;k++){
-        if (!mapX.has(xs[i]+k*GRID)) { ok=false; break; }
-      }
-      if (ok){
-        const nodes=[]; for (let k=0;k<10;k++) nodes.push(mapX.get(xs[i]+k*GRID));
-        nodes.forEach(n=>n.destroy());
-        createTen(xs[i], rowY);
-        changed = true;
-      }
+      let ok=true; for (let k=0;k<10;k++){ if (!mapX.has(xs[i]+k*GRID)) { ok=false; break; } }
+      if (ok){ const nodes=[]; for (let k=0;k<10;k++) nodes.push(mapX.get(xs[i]+k*GRID)); nodes.forEach(n=>n.destroy()); createTen(xs[i], rowY); changed = true; }
     }
   });
-
   if (!changed) {
-    const pool=[];
-    pieceLayer.find('Group').each(n=>{
-      const t=n.name()||n.getAttr('btype');
-      if (t!=='unit') return;
-      if (centerInZone(n, zoneTenRect)) pool.push(n);
-    });
-    if (pool.length>=10){
-      const anchor = snap(pool[0].x(), pool[0].y());
-      for (let i=0;i<10;i++) pool[i].destroy();
-      createTen(anchor.x, anchor.y);
-      changed = true;
-    }
+    const pool=[]; getPieceGroups().forEach(n=>{ const t=n.name()||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneTenRect)) pool.push(n); });
+    if (pool.length>=10){ const anchor=snap(pool[0].x(), pool[0].y()); for (let i=0;i<10;i++) pool[i].destroy(); createTen(anchor.x, anchor.y); changed = true; }
   }
-
   if (changed) { reorderTensZone(); pieceLayer.draw(); }
   return changed;
 }
-
 function composeHundredsInZone() {
   if (!zoneHundRect) return false;
   let changed = false;
-
   while (true) {
-    const units=[];
-    pieceLayer.find('Group').each(n=>{
-      const t=n.name()||n.getAttr('btype');
-      if (t!=='unit') return;
-      if (centerInZone(n, zoneHundRect)) units.push(n);
-    });
+    const units=[]; getPieceGroups().forEach(n=>{ const t=n.name()||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneHundRect)) units.push(n); });
     if (units.length < 10) break;
-    const anchor = snap(units[0].x(), units[0].y());
-    for (let i=0;i<10;i++) units[i].destroy();
-    createTen(anchor.x, anchor.y);
-    changed = true;
+    const anchor = snap(units[0].x(), units[0].y()); for (let i=0;i<10;i++) units[i].destroy(); createTen(anchor.x, anchor.y); changed = true;
   }
-
   while (true) {
-    const tens=[];
-    pieceLayer.find('Group').each(n=>{
-      const t=n.name()||n.getAttr('btype');
-      if (t!=='ten') return;
-      if (centerInZone(n, zoneHundRect)) tens.push(n);
-    });
+    const tens=[]; getPieceGroups().forEach(n=>{ const t=n.name()||n.getAttr('btype'); if (t==='ten' && centerInZone(n, zoneHundRect)) tens.push(n); });
     if (tens.length < 10) break;
-    const anchor = snap(tens[0].x(), tens[0].y());
-    for (let i=0;i<10;i++) tens[i].destroy();
-    createHundred(anchor.x, anchor.y);
-    changed = true;
+    const anchor = snap(tens[0].x(), tens[0].y()); for (let i=0;i<10;i++) tens[i].destroy(); createHundred(anchor.x, anchor.y); changed = true;
   }
-
   if (changed) { reorderHundredsZone(); pieceLayer.draw(); }
   return changed;
 }
-
 function checkBuildZones() {
   let changed;
-  do {
-    changed = false;
+  do { changed = false;
     if (composeTensInZone())     changed = true;
     if (composeHundredsInZone()) changed = true;
   } while (changed);
@@ -504,14 +355,13 @@ function checkBuildZones() {
 // ----- Botonera -----
 function wireUI(){
   const $ = id => document.getElementById(id);
-
   $('btn-unit')   ?.addEventListener('click', ()=>{ const p = spawnPosUnit();    createUnit(p.x, p.y); });
   $('btn-ten')    ?.addEventListener('click', ()=>{ const p = spawnPosTen();     createTen(p.x, p.y); });
   $('btn-hundred')?.addEventListener('click', ()=>{ const p = spawnPosHundred(); createHundred(p.x, p.y); });
   $('btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); });
   $('btn-compose')?.addEventListener('click', ()=>{ checkBuildZones(); });
 
-  // 🔊 Leer número (descomposición -> pausa -> número en letras)
+  // 🔊 Leer número
   $('btn-say')?.addEventListener('click', ()=>{
     const {units,tens,hundreds,total}=countAll();
     if (total === 0) return;
@@ -520,8 +370,8 @@ function wireUI(){
 
   // 🎯 Reto
   $('btn-challenge')?.addEventListener('click', ()=>{
-    challengeNumber = Math.floor(Math.random()*900)+1; // 1..900
-    const ch = document.getElementById('challenge');
+    challengeNumber = Math.floor(Math.random()*900)+1;
+    const ch=document.getElementById('challenge');
     if (ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
     speak(`Forma el número ${numEnLetras(challengeNumber)}`);
   });
@@ -535,85 +385,28 @@ function wireUI(){
     panel.setAttribute('aria-hidden', String(!open));
   });
 
-  // 🔍 Botones de zoom
-  const bindZoom = (id, fn) => {
-    const el = $(id);
-    if (!el) return;
-    el.addEventListener('click', (ev)=>{ ev.preventDefault(); fn(); });
-    el.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); fn(); });
-  };
+  // 🔍 Zoom
+  const bindZoom=(id,fn)=>{ const el=$(id); if(!el) return; el.addEventListener('click',e=>{e.preventDefault();fn();}); el.addEventListener('pointerdown',e=>{e.preventDefault();fn();}); };
   bindZoom('btn-zoom-in',  ()=> zoomStep(+1));
   bindZoom('btn-zoom-out', ()=> zoomStep(-1));
-  bindZoom('btn-reset-view', ()=>{
-    world.x = 0; world.y = 0; world.scale = 1;
-    applyWorldTransform();
-  });
+  bindZoom('btn-reset-view', ()=>{ world.x=0; world.y=0; world.scale=1; applyWorldTransform(); });
 }
 
-// ----- Pan & Zoom (rueda/drag) -----
-let isPanning = false;
-let lastPointerPos = null;
-
-stage.on('mousedown touchstart', (e)=>{
-  if (e.target && e.target.getLayer && e.target.getLayer() === pieceLayer) return;
-  isPanning = true;
-  lastPointerPos = stage.getPointerPosition();
-});
-stage.on('mousemove touchmove', ()=>{
-  if (!isPanning) return;
-  const pos = stage.getPointerPosition();
-  if (!pos || !lastPointerPos) return;
-  const dx = pos.x - lastPointerPos.x;
-  const dy = pos.y - lastPointerPos.y;
-  world.x += dx;
-  world.y += dy;
-  applyWorldTransform();
-  lastPointerPos = pos;
-});
-stage.on('mouseup touchend', ()=>{ isPanning = false; lastPointerPos = null; });
-
-stage.on('wheel', (e)=>{
-  e.evt.preventDefault();
-  const old = world.scale;
-  const pointer = stage.getPointerPosition();
-  const mouse = { x: (pointer.x - world.x) / old, y: (pointer.y - world.y) / old };
-  const dir = e.evt.deltaY > 0 ? -1 : 1;
-  let s = dir > 0 ? old * SCALE_BY : old / SCALE_BY;
-  s = Math.max(SCALE_MIN, Math.min(SCALE_MAX, s));
-  world.scale = s;
-  world.x = pointer.x - mouse.x * s;
-  world.y = pointer.y - mouse.y * s;
-  applyWorldTransform();
-});
-stage.on('dblclick dbltap', ()=>{
-  const pointer = stage.getPointerPosition();
-  const old = world.scale;
-  const mouse = { x: (pointer.x - world.x) / old, y: (pointer.y - world.y) / old };
-  let s = Math.min(SCALE_MAX, old * 1.25);
-  world.scale = s;
-  world.x = pointer.x - mouse.x * s;
-  world.y = pointer.y - mouse.y * s;
-  applyWorldTransform();
-});
+// ----- Pan & Zoom -----
+let isPanning=false, lastPointerPos=null;
+stage.on('mousedown touchstart', (e)=>{ if (e.target && e.target.getLayer && e.target.getLayer() === pieceLayer) return; isPanning=true; lastPointerPos=stage.getPointerPosition(); });
+stage.on('mousemove touchmove', ()=>{ if(!isPanning) return; const pos=stage.getPointerPosition(); if(!pos||!lastPointerPos) return; const dx=pos.x-lastPointerPos.x, dy=pos.y-lastPointerPos.y; world.x+=dx; world.y+=dy; applyWorldTransform(); lastPointerPos=pos; });
+stage.on('mouseup touchend', ()=>{ isPanning=false; lastPointerPos=null; });
+stage.on('wheel', (e)=>{ e.evt.preventDefault(); const old=world.scale; const p=stage.getPointerPosition(); const m={x:(p.x-world.x)/old,y:(p.y-world.y)/old}; let s=e.evt.deltaY>0?old/SCALE_BY:old*SCALE_BY; s=Math.max(SCALE_MIN,Math.min(SCALE_MAX,s)); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform(); });
+stage.on('dblclick dbltap', ()=>{ const p=stage.getPointerPosition(); const old=world.scale; const m={x:(p.x-world.x)/old,y:(p.y-world.y)/old}; let s=Math.min(SCALE_MAX, old*1.25); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform(); });
 
 // ----- Resize & arranque -----
 function relayout(){
   stage.width(window.innerWidth);
   stage.height(window.innerHeight);
-  drawGrid();
-  computeZones();
-  drawZones();
-  applyWorldTransform();
-  pieceLayer.draw();
-  updateStatus();
+  drawGrid(); computeZones(); drawZones(); applyWorldTransform(); pieceLayer.draw(); updateStatus();
 }
 window.addEventListener("resize", relayout);
 
 // Boot
-drawGrid();
-computeZones();
-drawZones();
-applyWorldTransform();
-wireUI();
-updateStatus();
-pieceLayer.draw();
+drawGrid(); computeZones(); drawZones(); applyWorldTransform(); wireUI(); updateStatus(); pieceLayer.draw();
