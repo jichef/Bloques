@@ -154,49 +154,102 @@ function overlapsAnyBox(box, skipId=null){
 }
 
 // ===== SPAWN: cursor de aparición sin solapes =====
+// ===== SPAWN: cursor de aparición priorizando el área visible =====
 const SPAWN = {
   baseX: 0, baseY: 0,
   curX: 0, curY: 0,
-  rowH: GRID*2, // altura de fila por defecto; se ajusta con la pieza más alta
-  maxWidth: GRID * 36, // ancho de banda de spawn (~36 celdas)
+  rowH: GRID*2,
+  band: { x: 0, y: 0, w: 0, h: 0 },  // banda de aparición activa
+  maxWidth: GRID * 36,                // límite de fallback cuando no usamos banda visible
 };
 
-// Recalcula la base de spawn a la derecha de la zona 10×10
+// Calcula una banda de aparición dentro del viewport, intentando:
+// 1) a la derecha de la 10×10, dentro de lo visible
+// 2) si no hay hueco, a la izquierda de la 10×10, dentro de lo visible
+// 3) si tampoco cabe, usa un fallback pequeño arriba a la derecha del viewport
+function computeSpawnBandInView(){
+  const v = visibleWorldRect();
+  const rightGap = 3*GRID;
+  const leftGap  = 3*GRID;
+
+  // Zona a la derecha de la 10×10, recortada al viewport
+  const rightBand = {
+    x: Math.max(ZONES.hund.x + ZONES.hund.w + rightGap, v.x + GRID),
+    y: Math.max(ZONES.hund.y + GRID, v.y + GRID),
+    w: (v.x + v.w) - Math.max(ZONES.hund.x + ZONES.hund.w + rightGap, v.x + GRID) - GRID,
+    h: Math.min(ZONES.hund.h - 2*GRID, v.h - 2*GRID)
+  };
+
+  // Zona a la izquierda de la 10×10, recortada al viewport
+  const leftBand = {
+    x: Math.max(v.x + GRID, v.x + GRID), // inicio del viewport
+    y: Math.max(ZONES.hund.y + GRID, v.y + GRID),
+    w: Math.min(ZONES.hund.x - leftGap - (v.x + GRID), v.w - 2*GRID),
+    h: Math.min(ZONES.hund.h - 2*GRID, v.h - 2*GRID)
+  };
+
+  // ¿Tiene ancho y alto razonables?
+  const ok = b => (b.w >= GRID*3) && (b.h >= GRID*2);
+
+  if (ok(rightBand)) return rightBand;
+  if (ok(leftBand))  return leftBand;
+
+  // Fallback: banda pequeña arriba-derecha del viewport
+  const fbW = Math.max(GRID*12, Math.min(v.w - 2*GRID, GRID*20));
+  const fbH = Math.max(GRID*6,  Math.min(v.h - 2*GRID, GRID*10));
+  return {
+    x: toCell(v.x + v.w - fbW - GRID),
+    y: toCell(v.y + GRID),
+    w: fbW, h: fbH
+  };
+}
+
+// Sitúa el cursor al inicio de la banda activa
 function resetSpawnBase(){
-  const offset = 3*GRID;
-  SPAWN.baseX = ZONES.hund.x + ZONES.hund.w + offset;
-  SPAWN.baseY = ZONES.hund.y + offset;
+  SPAWN.band = computeSpawnBandInView();
+  SPAWN.baseX = toCell(SPAWN.band.x);
+  SPAWN.baseY = toCell(SPAWN.band.y);
   SPAWN.curX  = SPAWN.baseX;
   SPAWN.curY  = SPAWN.baseY;
   SPAWN.rowH  = GRID*2;
 }
-// Avanza el cursor a la siguiente columna/fila
+
+// Avanza el cursor dentro de la banda; si llega al borde, baja de fila.
+// Si se llena la banda visible, saltará de vuelta a la base (seguirá probando filas).
 function advanceSpawn(w, h){
-  const stepX = Math.max(GRID, w + GRID); // dejar un GRID de separación
+  const stepX = Math.max(GRID, w + GRID);
   SPAWN.curX += stepX;
   SPAWN.rowH = Math.max(SPAWN.rowH, h + GRID);
-  if (SPAWN.curX - SPAWN.baseX > SPAWN.maxWidth){
+
+  const bandRight = SPAWN.band.x + SPAWN.band.w;
+  if (SPAWN.curX + w > bandRight){
     SPAWN.curX = SPAWN.baseX;
-    SPAWN.curY += SPAWN.rowH;
+    SPAWN.curY = toCell(SPAWN.curY + SPAWN.rowH);
     SPAWN.rowH = GRID*2;
+
+    // Si nos salimos por abajo de la banda, reinicia a la parte superior de la banda
+    if (SPAWN.curY + h > SPAWN.band.y + SPAWN.band.h){
+      SPAWN.curY = SPAWN.baseY;
+    }
   }
 }
-// Encuentra hueco alrededor del cursor actual (unos cuantos intentos)
+
+// Busca hueco en la banda visible; si no lo encuentra tras varios intentos, cae al fallback de borde derecho
 function findSpawnRect(w, h){
-  // intenta en el cursor actual y varias avanzadas si colisiona
-  const attempts = 200; // suficiente para no solapar
-  let tried = 0;
-  while (tried < attempts){
+  const attempts = 300;
+  for (let i=0; i<attempts; i++){
     const pos = snap(SPAWN.curX, SPAWN.curY);
     const box = { x: pos.x, y: pos.y, w, h };
     if (!overlapsAnyBox(box)) return box;
     advanceSpawn(w, h);
-    tried++;
   }
-  // fallback: colocar en cualquier sitio cercano al borde derecho visible
+  // Fallback: extremo derecho del viewport actual
   const v = visibleWorldRect();
-  const fallback = { x: toCell(v.x + v.w - w - GRID), y: toCell(v.y + GRID), w, h };
-  return fallback;
+  return {
+    x: toCell(v.x + v.w - w - GRID),
+    y: toCell(v.y + GRID),
+    w, h
+  };
 }
 
 // ----- Contador + descomposición -----
@@ -544,10 +597,14 @@ function wireUI(){
 // ----- Pan & Zoom -----
 let isPanning=false, lastPointerPos=null;
 stage.on('mousedown touchstart', (e)=>{ if (e.target && e.target.getLayer && e.target.getLayer() === pieceLayer) return; isPanning=true; lastPointerPos=stage.getPointerPosition(); });
-stage.on('mousemove touchmove', ()=>{ if(!isPanning) return; const pos=stage.getPointerPosition(); if(!pos||!lastPointerPos) return; const dx=pos.x-lastPointerPos.x, dy=pos.y-lastPointerPos.y; world.x+=dx; world.y+=dy; applyWorldTransform(); lastPointerPos=pos; });
+stage.on('mousemove touchmove', ()=>{ if(!isPanning) return; const pos=stage.getPointerPosition(); if(!pos||!lastPointerPos) return; const dx=pos.x-lastPointerPos.x, dy=pos.y-lastPointerPos.y; world.x+=dx; world.y+=dy; applyWorldTransform();
+lastPointerPos = pos;
+resetSpawnBase(); });
 stage.on('mouseup touchend', ()=>{ isPanning=false; lastPointerPos=null; });
-stage.on('wheel', (e)=>{ e.evt.preventDefault(); const old=world.scale; const p=stage.getPointerPosition(); const m={x:(p.x-world.x)/old,y:(p.y-world.y)/old}; let s=e.evt.deltaY>0?old/SCALE_BY:old*SCALE_BY; s=Math.max(SCALE_MIN,Math.min(SCALE_MAX,s)); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform(); });
-stage.on('dblclick dbltap', ()=>{ const p=stage.getPointerPosition(); const old=world.scale; const m={x:(p.x-world.x)/old,y:(p.y-world.y)/old}; let s=Math.min(SCALE_MAX, old*1.25); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform(); });
+stage.on('wheel', (e)=>{ e.evt.preventDefault(); const old=world.scale; const p=stage.getPointerPosition(); const m={x:(p.x-world.x)/old,y:(p.y-world.y)/old}; let s=e.evt.deltaY>0?old/SCALE_BY:old*SCALE_BY; s=Math.max(SCALE_MIN,Math.min(SCALE_MAX,s)); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform();
+resetSpawnBase(); });
+stage.on('dblclick dbltap', ()=>{ const p=stage.getPointerPosition(); const old=world.scale; const m={x:(p.x-world.x)/old,y:(p.y-world.y)/old}; let s=Math.min(SCALE_MAX, old*1.25); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform();
+resetSpawnBase(); });
 
 // ----- Intro (fade + zoom centrado al mundo) -----
 function startIntroAnimation(){
@@ -590,6 +647,7 @@ function relayout(){
   computeZonesCenteredWorld();
   drawZones();
   applyWorldTransform();
+  
   resetSpawnBase();
   pieceLayer.draw();
   updateStatus();
