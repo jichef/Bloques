@@ -39,6 +39,22 @@ stage.add(pieceLayer);
 
 // Transformación global (pan/zoom) aplicada a TODAS las layers
 const world = { x: 0, y: 0, scale: 1 };
+
+function zoomAt(pointer, targetScale){
+  const old = world.scale;
+  const s = Math.max(SCALE_MIN, Math.min(SCALE_MAX, targetScale));
+  const mouse = { x: (pointer.x - world.x) / old, y: (pointer.y - world.y) / old };
+  world.scale = s;
+  world.x = pointer.x - mouse.x * s;
+  world.y = pointer.y - mouse.y * s;
+  applyWorldTransform();
+}
+function zoomStep(direction){ // direction: +1 (in) o -1 (out)
+  const factor = direction > 0 ? SCALE_BY : 1 / SCALE_BY;
+  const target = world.scale * factor;
+  const center = { x: stage.width() / 2, y: stage.height() / 2 };
+  zoomAt(center, target);
+}
 function applyWorldTransform() {
   [gridLayer, uiLayer, pieceLayer].forEach(L => {
     L.position({ x: world.x, y: world.y });
@@ -335,6 +351,12 @@ function wireUI(){
     btn.setAttribute('aria-expanded', String(open));
     panel.setAttribute('aria-hidden', String(!open));
   });
+  $('btn-zoom-in')   ?.addEventListener('click', ()=> zoomStep(+1));
+$('btn-zoom-out')  ?.addEventListener('click', ()=> zoomStep(-1));
+$('btn-reset-view')?.addEventListener('click', ()=>{
+  world.x = 0; world.y = 0; world.scale = 1;
+  applyWorldTransform();
+});
 }
 
 // ----- Pan & Zoom (sin Groups padres; sincronizamos las 3 layers) -----
