@@ -1,4 +1,4 @@
-// ===== Bloques — script.js (v11) =====
+// ===== Bloques — script.js (v12 con contorno suave) =====
 const GRID = 32;
 Konva.pixelRatio = 1;
 
@@ -6,8 +6,20 @@ const COLORS = { unit: "#1f78ff", ten: "#ff3b30", hundred: "#2ecc71" };
 const ZONE_STROKE = "#6c5ce7";
 const ZONE_FILL   = "rgba(108,92,231,0.06)";
 
+// Estilo de fichas (contorno + sombra)
+const CHIP_STYLE = {
+  stroke: "#1a1a1a",
+  strokeWidth: 1,
+  cornerRadius: 6,
+  shadowColor: "rgba(0,0,0,0.4)",
+  shadowBlur: 6,
+  shadowOffsetX: 3,
+  shadowOffsetY: 3,
+  shadowOpacity: 0.25
+};
+
 // ===== Mundo grande =====
-const WORLD_COLS = 160; // ancho en celdas (ajusta si quieres más)
+const WORLD_COLS = 160; // ancho en celdas
 const WORLD_ROWS = 120; // alto en celdas
 
 // ----- Stage y capas -----
@@ -16,112 +28,62 @@ const stage = new Konva.Stage({
   width: window.innerWidth,
   height: window.innerHeight,
 });
-
-// Todo el “mundo” vive dentro de este grupo (lo escalamos y movemos para pan/zoom)
-const world = new Konva.Group({ x: 0, y: 0, scaleX: 1, scaleY: 1 });
-const gridLayer = new Konva.Layer({ listening: false });
-const uiLayer   = new Konva.Layer({ listening: false }); // zonas y rótulos
-const pieceLayer= new Konva.Layer();                      // piezas (escuchan eventos)
+const world      = new Konva.Group({ x: 0, y: 0, scaleX: 1, scaleY: 1 });
+const gridLayer  = new Konva.Layer({ listening: false });
+const uiLayer    = new Konva.Layer({ listening: false });
+const pieceLayer = new Konva.Layer();
 world.add(gridLayer);
 world.add(uiLayer);
 world.add(pieceLayer);
 stage.add(world);
 
-// ----- Cuadrícula (mundo grande) -----
+// ----- Cuadrícula -----
 function drawGrid() {
   gridLayer.destroyChildren();
   const W = WORLD_COLS * GRID;
   const H = WORLD_ROWS * GRID;
 
-  // Borde del mundo
   gridLayer.add(new Konva.Rect({
     x: 0, y: 0, width: W, height: H,
     stroke: "#dddddd", strokeWidth: 2, listening: false
   }));
 
-  // Líneas
   for (let x = 0; x <= W; x += GRID) {
     const X = x + 0.5;
-    gridLayer.add(new Konva.Line({
-      points: [X, 0, X, H],
-      stroke: "#e5e5e5",
-      strokeWidth: 1,
-      listening: false
-    }));
+    gridLayer.add(new Konva.Line({ points: [X,0,X,H], stroke: "#e5e5e5", strokeWidth: 1, listening: false }));
   }
   for (let y = 0; y <= H; y += GRID) {
     const Y = y + 0.5;
-    gridLayer.add(new Konva.Line({
-      points: [0, Y, W, Y],
-      stroke: "#e5e5e5",
-      strokeWidth: 1,
-      listening: false
-    }));
+    gridLayer.add(new Konva.Line({ points: [0,Y,W,Y], stroke: "#e5e5e5", strokeWidth: 1, listening: false }));
   }
   gridLayer.draw();
 }
 
-// ----- Utils (en coords del mundo) -----
+// ----- Utils -----
 const toCell = (n) => Math.round(n / GRID) * GRID;
 const snap   = (x,y)=>({x:toCell(x), y:toCell(y)});
 const centerWorld = () => ({ x: toCell((WORLD_COLS*GRID)/2), y: toCell((WORLD_ROWS*GRID)/2) });
-
 function speak(text){
-  try { const u=new SpeechSynthesisUtterance(text); u.lang="es-ES";
-        speechSynthesis.cancel(); speechSynthesis.speak(u);} catch {}
+  try{ const u=new SpeechSynthesisUtterance(text); u.lang="es-ES"; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{}
 }
 
 // ----- Zonas 1×10 (decenas) y 10×10 (centenas) -----
 let ZONES = null;
 function computeZones() {
-  // Posiciones en el mundo (en celdas)
   const margin = GRID * 2;
-
-  // Decenas: 1×10 (alto 1, ancho 10)
-  const tens = {
-    x: margin,
-    y: margin,
-    w: GRID * 10,
-    h: GRID * 1,
-    label: "Zona Decenas (1×10)"
-  };
-
-  // Centenas: 10×10
-  const hund = {
-    x: margin,
-    y: tens.y + tens.h + GRID * 2,
-    w: GRID * 10,
-    h: GRID * 10,
-    label: "Zona Centenas (10×10)"
-  };
+  const tens = { x: margin, y: margin, w: GRID * 10, h: GRID * 1, label: "Zona Decenas (1×10)" };
+  const hund = { x: margin, y: tens.y + tens.h + GRID * 2, w: GRID * 10, h: GRID * 10, label: "Zona Centenas (10×10)" };
   ZONES = { tens, hund };
 }
-
 function drawZones() {
   uiLayer.destroyChildren();
   const { tens, hund } = ZONES;
-
-  // Decenas (1×10)
-  uiLayer.add(new Konva.Rect({
-    x: tens.x, y: tens.y, width: tens.w, height: tens.h,
-    stroke: ZONE_STROKE, strokeWidth: 2, cornerRadius: 6, fill: ZONE_FILL, listening: false
-  }));
-  uiLayer.add(new Konva.Text({
-    x: tens.x + 6, y: tens.y - 22, text: tens.label, fontSize: 16, fill: ZONE_STROKE, listening: false
-  }));
-
-  // Centenas (10×10)
-  uiLayer.add(new Konva.Rect({
-    x: hund.x, y: hund.y, width: hund.w, height: hund.h,
-    stroke: ZONE_STROKE, strokeWidth: 2, cornerRadius: 6, fill: ZONE_FILL, listening: false
-  }));
-  uiLayer.add(new Konva.Text({
-    x: hund.x + 6, y: hund.y - 22, text: hund.label, fontSize: 16, fill: ZONE_STROKE, listening: false
-  }));
-
+  uiLayer.add(new Konva.Rect({ x:tens.x, y:tens.y, width:tens.w, height:tens.h, stroke: ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill: ZONE_FILL, listening:false }));
+  uiLayer.add(new Konva.Text({ x:tens.x+6, y:tens.y-22, text:tens.label, fontSize:16, fill: ZONE_STROKE, listening:false }));
+  uiLayer.add(new Konva.Rect({ x:hund.x, y:hund.y, width:hund.w, height:hund.h, stroke: ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill: ZONE_FILL, listening:false }));
+  uiLayer.add(new Konva.Text({ x:hund.x+6, y:hund.y-22, text:hund.label, fontSize:16, fill: ZONE_STROKE, listening:false }));
   uiLayer.draw();
 }
-
 function nodeBox(n){ return { x: n.x(), y: n.y(), w: n.width(), h: n.height() }; }
 function isInsideZone(n, zone){
   const b = nodeBox(n);
@@ -155,13 +117,11 @@ function updateStatus(){
       <div class="label">Total</div><div class="value">${total}</div>`;
   }
 }
-
-// refrescar cuando cambie la capa o al terminar arrastres
 pieceLayer.on('add', updateStatus);
 pieceLayer.on('destroy', updateStatus);
 stage.on('dragend', updateStatus);
 
-// ----- Comunes (drag, double) -----
+// ----- Comunes (drag/double) -----
 function onDragEnd(shape){
   shape.on("dragend", ()=>{
     shape.position(snap(shape.x(), shape.y()));
@@ -174,18 +134,18 @@ function onDouble(shape, cb){
   let lastTap=0, lastClick=0;
   shape.on('dbltap', cb);
   shape.on('dblclick', cb);
-  shape.on('pointerdown', ()=>{
-    const now=Date.now(); if (now-lastTap<300) cb(); lastTap=now;
-  });
-  shape.on('click', ()=>{
-    const now=Date.now(); if (now-lastClick<300) cb(); lastClick=now;
-  });
+  shape.on('pointerdown', ()=>{ const now=Date.now(); if(now-lastTap<300) cb(); lastTap=now; });
+  shape.on('click',       ()=>{ const now=Date.now(); if(now-lastClick<300) cb(); lastClick=now; });
 }
 
-// ----- Piezas (viven en 'pieceLayer' dentro del 'world') -----
+// ----- Piezas -----
 function createUnit(x,y){
   const p=snap(x,y);
-  const r=new Konva.Rect({ x:p.x, y:p.y, width:GRID, height:GRID, fill:COLORS.unit, draggable:true, name:'unit' });
+  const r=new Konva.Rect({
+    x:p.x, y:p.y, width:GRID, height:GRID,
+    fill:COLORS.unit, draggable:true, name:'unit',
+    ...CHIP_STYLE
+  });
   r.setAttr('btype','unit');
   onDragEnd(r);
   pieceLayer.add(r); pieceLayer.draw();
@@ -194,7 +154,11 @@ function createUnit(x,y){
 }
 function createTen(x,y){
   const p=snap(x,y);
-  const r=new Konva.Rect({ x:p.x, y:p.y, width:10*GRID, height:GRID, fill:COLORS.ten, draggable:true, name:'ten' });
+  const r=new Konva.Rect({
+    x:p.x, y:p.y, width:10*GRID, height:GRID,
+    fill:COLORS.ten, draggable:true, name:'ten',
+    ...CHIP_STYLE
+  });
   r.setAttr('btype','ten');
   onDragEnd(r);
   onDouble(r, ()=>{
@@ -209,7 +173,11 @@ function createTen(x,y){
 }
 function createHundred(x,y){
   const p=snap(x,y);
-  const r=new Konva.Rect({ x:p.x, y:p.y, width:10*GRID, height:10*GRID, fill:COLORS.hundred, draggable:true, name:'hundred' });
+  const r=new Konva.Rect({
+    x:p.x, y:p.y, width:10*GRID, height:10*GRID,
+    fill:COLORS.hundred, draggable:true, name:'hundred',
+    ...CHIP_STYLE
+  });
   r.setAttr('btype','hundred');
   onDragEnd(r);
   onDouble(r, ()=>{
@@ -224,13 +192,10 @@ function createHundred(x,y){
 }
 
 // ----- ZONAS de construcción -----
-// (A) Decenas: zona 1×10 → 10 unidades => 1 decena
 function composeTensInZone() {
   const { tens } = ZONES;
   let changed = false;
 
-  // Intentar 10 contiguas en fila dentro de la zona (como pista visual)
-  // Mapa: y -> Map(x -> unitNode)
   const rows = new Map();
   pieceLayer.getChildren().forEach(n=>{
     const t = n.name()||n.getAttr('btype');
@@ -257,7 +222,6 @@ function composeTensInZone() {
     }
   });
 
-  // Si no hay 10 contiguas, acepta 10 cualesquiera dentro
   if (!changed) {
     const pool=[];
     pieceLayer.getChildren().forEach(n=>{
@@ -277,12 +241,11 @@ function composeTensInZone() {
   return changed;
 }
 
-// (B) Centenas: zona 10×10 → acepta combinación
 function composeHundredsInZone() {
   const { hund } = ZONES;
   let changed = false;
 
-  // 1) Mientras haya >=10 unidades dentro, convertir a decena
+  // Unidades -> Decenas
   while (true) {
     const units=[];
     pieceLayer.getChildren().forEach(n=>{
@@ -296,8 +259,7 @@ function composeHundredsInZone() {
     createTen(anchor.x, anchor.y);
     changed = true;
   }
-
-  // 2) Mientras haya >=10 decenas dentro, convertir a centena
+  // Decenas -> Centena
   while (true) {
     const tens=[];
     pieceLayer.getChildren().forEach(n=>{
@@ -316,7 +278,6 @@ function composeHundredsInZone() {
   return changed;
 }
 
-// Ejecuta ambas zonas hasta que ya no se pueda construir más
 function checkBuildZones() {
   let changed;
   do {
@@ -327,7 +288,7 @@ function checkBuildZones() {
   updateStatus();
 }
 
-// ----- Botonera (IDs de tu HTML) -----
+// ----- Botonera -----
 function wireUI(){
   const $ = id => document.getElementById(id);
   $('btn-unit')   ?.addEventListener('click', ()=>{ const c=centerWorld(); createUnit(c.x,c.y); });
@@ -354,17 +315,13 @@ function wireUI(){
 }
 
 // ----- Pan & Zoom -----
-// Pan: arrastrar en vacío (no sobre una ficha)
 let isPanning = false;
 let lastPointerPos = null;
-
 stage.on('mousedown touchstart', (e)=>{
-  // si clicas directamente sobre una pieza, no pan
   if (e.target && e.target.getParent() === pieceLayer) return;
   isPanning = true;
   lastPointerPos = stage.getPointerPosition();
 });
-
 stage.on('mousemove touchmove', ()=>{
   if (!isPanning) return;
   const pos = stage.getPointerPosition();
@@ -376,51 +333,28 @@ stage.on('mousemove touchmove', ()=>{
   lastPointerPos = pos;
   stage.batchDraw();
 });
+stage.on('mouseup touchend', ()=>{ isPanning = false; lastPointerPos = null; });
 
-stage.on('mouseup touchend', ()=>{
-  isPanning = false;
-  lastPointerPos = null;
-});
-
-// Zoom con rueda / trackpad
-const SCALE_MIN = 0.4;
-const SCALE_MAX = 3.0;
-const SCALE_BY  = 1.06;
-
+const SCALE_MIN = 0.4, SCALE_MAX = 3.0, SCALE_BY = 1.06;
 stage.on('wheel', (e)=>{
   e.evt.preventDefault();
-  const oldScale = world.scaleX();
+  const old = world.scaleX();
   const pointer = stage.getPointerPosition();
-  const mousePointTo = {
-    x: (pointer.x - world.x()) / oldScale,
-    y: (pointer.y - world.y()) / oldScale,
-  };
-  const direction = e.evt.deltaY > 0 ? -1 : 1;
-  let newScale = direction > 0 ? oldScale * SCALE_BY : oldScale / SCALE_BY;
-  newScale = Math.max(SCALE_MIN, Math.min(SCALE_MAX, newScale));
-  world.scale({ x: newScale, y: newScale });
-  const newPos = {
-    x: pointer.x - mousePointTo.x * newScale,
-    y: pointer.y - mousePointTo.y * newScale,
-  };
-  world.position(newPos);
+  const mouse = { x: (pointer.x - world.x()) / old, y: (pointer.y - world.y()) / old };
+  const dir = e.evt.deltaY > 0 ? -1 : 1;
+  let s = dir > 0 ? old * SCALE_BY : old / SCALE_BY;
+  s = Math.max(SCALE_MIN, Math.min(SCALE_MAX, s));
+  world.scale({ x:s, y:s });
+  world.position({ x: pointer.x - mouse.x * s, y: pointer.y - mouse.y * s });
   stage.batchDraw();
 });
-
-// (Opcional) Doble toque para zoom in/out
 stage.on('dblclick dbltap', ()=>{
   const pointer = stage.getPointerPosition();
-  const oldScale = world.scaleX();
-  let newScale = Math.min(SCALE_MAX, oldScale * 1.25);
-  const mousePointTo = {
-    x: (pointer.x - world.x()) / oldScale,
-    y: (pointer.y - world.y()) / oldScale,
-  };
-  world.scale({ x: newScale, y: newScale });
-  world.position({
-    x: pointer.x - mousePointTo.x * newScale,
-    y: pointer.y - mousePointTo.y * newScale,
-  });
+  const old = world.scaleX();
+  const mouse = { x: (pointer.x - world.x()) / old, y: (pointer.y - world.y()) / old };
+  let s = Math.min(SCALE_MAX, old * 1.25);
+  world.scale({ x:s, y:s });
+  world.position({ x: pointer.x - mouse.x * s, y: pointer.y - mouse.y * s });
   stage.batchDraw();
 });
 
