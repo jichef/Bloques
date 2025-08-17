@@ -1,11 +1,12 @@
 /* ====== Parámetros ====== */
-const GRID = 32;        // Cuadrícula invisible 32x32
+const GRID = 32;        // Cuadrícula invisible/visible 32x32
 const UNIT_SIZE = 30;   // Tamaño visual del bloque (ligeramente menor que GRID)
 const COLORS = {
   unit: "blue",
   ten: "red",
   hundred: "green",
 };
+const GRID_COLOR = "#e5e5e5";  // color de la cuadrícula
 const DOUBLE_TAP_MS = 300;
 
 /* ====== Escenario (canvas) ====== */
@@ -15,8 +16,37 @@ const stage = new Konva.Stage({
   height: window.innerHeight,
 });
 
+// Capa de cuadrícula (al fondo) + capa de piezas
+const gridLayer = new Konva.Layer({ listening: false });
 const layer = new Konva.Layer();
+stage.add(gridLayer);
 stage.add(layer);
+
+/* ====== Dibujo de cuadrícula ====== */
+function drawGrid() {
+  gridLayer.destroyChildren();
+
+  const w = stage.width();
+  const h = stage.height();
+
+  // Líneas verticales
+  for (let x = 0; x <= w; x += GRID) {
+    gridLayer.add(new Konva.Line({
+      points: [x, 0, x, h],
+      stroke: GRID_COLOR,
+      strokeWidth: 1,
+    }));
+  }
+  // Líneas horizontales
+  for (let y = 0; y <= h; y += GRID) {
+    gridLayer.add(new Konva.Line({
+      points: [0, y, w, y],
+      stroke: GRID_COLOR,
+      strokeWidth: 1,
+    }));
+  }
+  gridLayer.draw();
+}
 
 /* ====== Utilidades ====== */
 function snapToGrid(x, y) {
@@ -203,7 +233,8 @@ function clearAll() {
 
 /* ====== Composición automática ======
    - 10 unidades alineadas -> 1 decena
-   - 10 decenas en columna o 100 unidades (10x10) -> 1 centena
+   - 10 decenas en columna -> 1 centena
+   - 100 unidades (10x10) -> 1 centena
 */
 function indexByGrid() {
   const grid = new Map(); // key "gx,gy" -> node
@@ -266,7 +297,6 @@ function tryComposeHundredsFromTens(grid) {
       const keyR = `${x0},${y0 + r * GRID}`;
       const n = grid.get(keyR);
       if (!n || n.getAttr("btype") !== "ten") return;
-      // Asegurar que todas las decenas tienen el mismo ancho y posX
       seq.push(n);
     }
     composed.push({ x: x0, y: y0, nodes: seq });
@@ -351,11 +381,12 @@ function newChallenge() {
 function resize() {
   stage.width(window.innerWidth);
   stage.height(window.innerHeight);
+  drawGrid();
   layer.draw();
 }
 window.addEventListener("resize", resize);
 
 /* ====== Arranque ====== */
+drawGrid();
 updateStatus();
-// Sugerencia: llamar a newChallenge() si quieres empezar con reto.
-// newChallenge();
+// newChallenge(); // Activa si quieres empezar con reto
