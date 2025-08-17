@@ -175,22 +175,25 @@ function countAll(){
   });
   return { units, tens, hundreds, total: units + 10*tens + 100*hundreds };
 }
-function updateStatus(){
-  const {units,tens,hundreds,total}=countAll();
-  const enLetras = numEnLetras(total);
+function updateStatus() {
+  const units = blocks.filter(b => b.type === 'unit').length;
+  const tens = blocks.filter(b => b.type === 'ten').length;
+  const hundreds = blocks.filter(b => b.type === 'hundred').length;
+  const total = units + tens * 10 + hundreds * 100;
 
-  const st=document.getElementById("status");
-  if (st) st.textContent = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades — (${enLetras})`;
+  // Texto del estado
+  document.getElementById("status").textContent =
+    `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
 
-  const b=document.getElementById("breakdown");
-  if (b){
-    b.innerHTML = `
-      <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
-      <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
-      <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
-      <div class="label">Total</div><div class="value">${total}</div>
-      <div class="label">En letras</div><div class="value">${enLetras}</div>`;
-  }
+  // Panel de descomposición
+  const breakdown = document.getElementById("breakdown");
+  breakdown.innerHTML = `
+    <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds * 100}</div>
+    <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens * 10}</div>
+    <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
+    <div class="label">Total</div><div class="value">${total}</div>
+    <div class="label">En letras</div><div class="value">${numeroALetras(total)}</div>
+  `;
 }
 
 // ======= AUTO-ORDENACIÓN EN ZONAS =======
