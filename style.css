@@ -1,10 +1,6 @@
-
-:root {
-  --ui-bg: #ffffffcc;
-}
+:root { --ui-bg: #ffffffcc; }
 
 * { box-sizing: border-box; }
-
 html, body {
   margin: 0;
   height: 100%;
@@ -12,11 +8,9 @@ html, body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
-#container {
-  position: fixed;
-  inset: 0;
-}
+#container { position: fixed; inset: 0; }
 
+/* Controles superiores */
 #controls {
   position: fixed;
   top: env(safe-area-inset-top, 8px);
@@ -29,34 +23,51 @@ html, body {
   border-radius: 12px;
   box-shadow: 0 6px 18px rgba(0,0,0,.12);
 }
-
 #controls .row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 6px;
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;
 }
-
 #controls button {
-  font-size: 16px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: none;
-  background: #3498db;
-  color: #fff;
-  cursor: pointer;
+  font-size: 16px; padding: 10px 14px; border-radius: 10px;
+  border: none; background: #3498db; color: #fff; cursor: pointer;
 }
-
 #controls button:hover { background: #2e86c1; }
 #controls button:active { transform: translateY(1px); }
+#status { font-size: 16px; padding-top: 2px; }
 
-#status {
-  font-size: 16px;
-  padding: 6px 2px 2px;
+/* Panel inferior (bottom sheet) */
+#panel {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  transform: translateY(calc(100% - 44px)); /* solo pestaña visible */
+  transition: transform .25s ease;
+  z-index: 11;
 }
+#panel.open { transform: translateY(0); }
+#panel-toggle {
+  width: 100%;
+  height: 44px;
+  border: none;
+  background: #34495e;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+}
+#panel-content {
+  background: #fff;
+  border-top: 1px solid #e5e5e5;
+  padding: 12px 14px 16px;
+  max-height: 40vh;
+  overflow: auto;
+}
+#panel h3, #panel h4 { margin: 8px 0; }
+#breakdown {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  font-size: 16px;
+}
+#breakdown .label { color: #555; }
+#breakdown .value { font-weight: 600; }
 
-#challenge {
-  font-weight: 700;
-  font-size: 16px;
-  min-width: 120px;
-}
+/* Evitar zoom raro al tocar botones en iOS */
+button { touch-action: manipulation; }
