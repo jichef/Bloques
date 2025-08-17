@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.4: zoom + spawn visible + auto-orden en zonas) =====
-console.log("Bloques v16.4");
+// ===== Bloques — script.js (v16.5: auto-slot + composición fiable) =====
+console.log("Bloques v16.5");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -58,41 +58,24 @@ function screenToWorld(pt){
     y: (pt.y - world.y) / world.scale
   };
 }
-
-// Rectángulo visible actual en coordenadas del mundo
 function visibleWorldRect(){
   const tl = screenToWorld({ x: 0, y: 0 });
   const br = screenToWorld({ x: stage.width(), y: stage.height() });
   return { x: tl.x, y: tl.y, w: br.x - tl.x, h: br.y - tl.y };
 }
-
-// Centrar en la zona visible (alineado a la rejilla)
 function visibleWorldCenter(){
   const r = visibleWorldRect();
   return { x: toCell(r.x + r.w/2), y: toCell(r.y + r.h/2) };
 }
-
-// Asegura que una ficha de tamaño (w,h) cabe dentro de lo visible
 function clampToVisible(x, y, w, h){
   const r = visibleWorldRect();
   const CX = Math.min(Math.max(x, r.x), r.x + r.w - w);
   const CY = Math.min(Math.max(y, r.y), r.y + r.h - h);
   return snap(CX, CY);
 }
-
-// Posiciones “seguras” para cada tipo de ficha, dentro de lo visible
-function spawnPosUnit(){
-  const c = visibleWorldCenter();
-  return clampToVisible(c.x, c.y, GRID, GRID);
-}
-function spawnPosTen(){
-  const c = visibleWorldCenter();
-  return clampToVisible(c.x - 5*GRID, c.y, 10*GRID, GRID);
-}
-function spawnPosHundred(){
-  const c = visibleWorldCenter();
-  return clampToVisible(c.x - 5*GRID, c.y - 5*GRID, 10*GRID, 10*GRID);
-}
+function spawnPosUnit(){ const c = visibleWorldCenter(); return clampToVisible(c.x, c.y, GRID, GRID); }
+function spawnPosTen(){ const c = visibleWorldCenter(); return clampToVisible(c.x - 5*GRID, c.y, 10*GRID, GRID); }
+function spawnPosHundred(){ const c = visibleWorldCenter(); return clampToVisible(c.x - 5*GRID, c.y - 5*GRID, 10*GRID, 10*GRID); }
 
 // Helpers de zoom
 function zoomAt(pointer, targetScale){
@@ -136,19 +119,21 @@ function drawGrid() {
 // ----- Utils -----
 const toCell = (n) => Math.round(n / GRID) * GRID;
 const snap   = (x,y)=>({x:toCell(x), y:toCell(y)});
-const centerWorld = () => ({ x: toCell((WORLD_COLS*GRID)/2), y: toCell((WORLD_ROWS*GRID)/2) });
 function speak(text){
   try{ const u=new SpeechSynthesisUtterance(text); u.lang="es-ES"; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{}
 }
 
-// get bounding box ABSOLUTO
+// ==== Geometría de zona: intersección / centro dentro ====
 function nodeBoxAbs(n){ const r = n.getClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }
-function isInsideZone(node, zoneRect){
+function rectsIntersect(a,b){
+  return !(a.x + a.w <= b.x || a.x >= b.x + b.w || a.y + a.h <= b.y || a.y >= b.y + b.h);
+}
+function intersectsZone(node, zoneRect){ return rectsIntersect(nodeBoxAbs(node), nodeBoxAbs(zoneRect)); }
+function centerInZone(node, zoneRect){
   const b = nodeBoxAbs(node);
   const z = nodeBoxAbs(zoneRect);
-  return b.x >= z.x && b.y >= z.y &&
-         (b.x + b.w) <= (z.x + z.w) &&
-         (b.y + b.h) <= (z.y + z.h);
+  const cx = b.x + b.w/2, cy = b.y + b.h/2;
+  return (cx >= z.x && cx <= z.x+z.w && cy >= z.y && cy <= z.y+z.h);
 }
 
 // ----- Zonas 1×10 y 10×10 -----
@@ -208,25 +193,20 @@ function updateStatus(){
 function reorderTensZone(){
   if (!zoneTenRect) return;
   const z = ZONES.tens;
-  // Solo UNIDADES dentro de zona de decenas
   const units = [];
   pieceLayer.getChildren().forEach(g=>{
     if (g.getClassName() !== 'Group') return;
     const t = g.name() || g.getAttr('btype');
     if (t !== 'unit') return;
-    if (isInsideZone(g, zoneTenRect)) units.push(g);
+    if (centerInZone(g, zoneTenRect)) units.push(g);
   });
-  // Orden estable por x,y para consistencia
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
-  // Colocar en 1×10 (izq→der). Si hay >10, se quedan alineadas en la misma fila (las extra se pondrán encima: puedes ampliar a 2 filas si quieres)
   units.forEach((g,i)=>{
-    const X = z.x + Math.min(i,9)*GRID;
-    const Y = z.y;
-    g.position(snap(X,Y));
+    const idx = Math.min(i,9);
+    g.position(snap(z.x + idx*GRID, z.y));
   });
   pieceLayer.batchDraw();
 }
-
 function reorderHundredsZone(){
   if (!zoneHundRect) return;
   const z = ZONES.hund;
@@ -234,29 +214,23 @@ function reorderHundredsZone(){
   pieceLayer.getChildren().forEach(g=>{
     if (g.getClassName() !== 'Group') return;
     const t = g.name() || g.getAttr('btype');
-    if (!isInsideZone(g, zoneHundRect)) return;
+    if (!centerInZone(g, zoneHundRect)) return;
     if (t==='ten') tens.push(g);
     else if (t==='unit') units.push(g);
   });
-  // Orden estable
   tens.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
 
-  // 1) Decenas ocupan filas completas desde arriba
+  // Decenas ocupan filas completas
   tens.forEach((g,i)=>{
-    const X = z.x;
-    const Y = z.y + i*GRID;
-    g.position(snap(X,Y));
+    g.position(snap(z.x, z.y + i*GRID));
   });
-
-  // 2) Unidades rellenan a partir de la primera fila libre
+  // Unidades rellenan a partir de la primera fila libre
   const startRow = tens.length;
   units.forEach((g,i)=>{
     const row = startRow + Math.floor(i/10);
     const col = i % 10;
-    const X = z.x + col*GRID;
-    const Y = z.y + row*GRID;
-    g.position(snap(X,Y));
+    g.position(snap(z.x + col*GRID, z.y + row*GRID));
   });
 
   pieceLayer.batchDraw();
@@ -266,19 +240,26 @@ function reorderHundredsZone(){
 function onDragEnd(group){
   group.on("dragend", ()=>{
     // Snap general
-    const p = snap(group.x(), group.y());
-    group.position(p);
+    group.position(snap(group.x(), group.y()));
 
-    // Si cae en zonas especiales, reordenar
-    if (zoneTenRect && isInsideZone(group, zoneTenRect)) {
+    const type = group.name() || group.getAttr('btype');
+
+    // Si ROZA la zona de decenas con una unidad → la forzamos a entrar y reordenamos
+    if (zoneTenRect && type==='unit' && intersectsZone(group, zoneTenRect)) {
+      // meter dentro (posición base; luego reorden)
+      group.position(snap(ZONES.tens.x, ZONES.tens.y));
       reorderTensZone();
+      checkBuildZones(); // puede convertir 10U → 1D
     }
-    if (zoneHundRect && isInsideZone(group, zoneHundRect)) {
+
+    // Si ROZA la zona de centenas con una unidad o decena → meter y reordenar
+    if (zoneHundRect && (type==='unit' || type==='ten') && intersectsZone(group, zoneHundRect)) {
+      group.position(snap(ZONES.hund.x, ZONES.hund.y));
       reorderHundredsZone();
+      checkBuildZones(); // puede convertir 10D → 1C o 10U → 1D
     }
 
     pieceLayer.draw();
-    checkBuildZones(); // podría fusionar → reordenamos después dentro de checkBuildZones
     updateStatus();
   });
 }
@@ -297,23 +278,21 @@ function addChipRectTo(group, w, h, fill){
   return rect;
 }
 function createUnit(x,y){
-  const p = snap(x,y);
-  const g = new Konva.Group({ x:p.x, y:p.y, draggable:true, name:'unit' });
+  const g = new Konva.Group({ x: toCell(x), y: toCell(y), draggable:true, name:'unit' });
   g.setAttr('btype','unit');
   addChipRectTo(g, GRID, GRID, COLORS.unit);
   onDragEnd(g);
   pieceLayer.add(g); pieceLayer.draw();
 
-  // Si nace dentro de zonas → reordenar
-  if (zoneTenRect && isInsideZone(g, zoneTenRect)) reorderTensZone();
-  if (zoneHundRect && isInsideZone(g, zoneHundRect)) reorderHundredsZone();
+  // Si nace dentro o rozando zonas → ordenar/convertir
+  if (zoneTenRect && intersectsZone(g, zoneTenRect)) { g.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); }
+  if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
 
   checkBuildZones(); updateStatus();
   return g;
 }
 function createTen(x,y){
-  const p = snap(x,y);
-  const g = new Konva.Group({ x:p.x, y:p.y, draggable:true, name:'ten' });
+  const g = new Konva.Group({ x: toCell(x), y: toCell(y), draggable:true, name:'ten' });
   g.setAttr('btype','ten');
   addChipRectTo(g, 10*GRID, GRID, COLORS.ten);
   onDragEnd(g);
@@ -325,14 +304,13 @@ function createTen(x,y){
   });
   pieceLayer.add(g); pieceLayer.draw();
 
-  if (zoneHundRect && isInsideZone(g, zoneHundRect)) reorderHundredsZone();
+  if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
 
   checkBuildZones(); updateStatus();
   return g;
 }
 function createHundred(x,y){
-  const p = snap(x,y);
-  const g = new Konva.Group({ x:p.x, y:p.y, draggable:true, name:'hundred' });
+  const g = new Konva.Group({ x: toCell(x), y: toCell(y), draggable:true, name:'hundred' });
   g.setAttr('btype','hundred');
   addChipRectTo(g, 10*GRID, 10*GRID, COLORS.hundred);
   onDragEnd(g);
@@ -347,23 +325,23 @@ function createHundred(x,y){
   return g;
 }
 
-// ----- ZONAS de construcción (composición) -----
+// ----- ZONAS de composición -----
 function composeTensInZone() {
   if (!zoneTenRect) return false;
   let changed = false;
 
-  // Mapa de filas dentro de la zona (UNIDADES)
+  // Tomamos UNIDADES cuyo CENTRO está en la zona
   const rows = new Map();
   pieceLayer.getChildren().forEach(n=>{
     const t = n.name()||n.getAttr('btype');
     if (t!=='unit') return;
-    if (!isInsideZone(n, zoneTenRect)) return;
+    if (!centerInZone(n, zoneTenRect)) return;
     const rowY = toCell(n.y());
     if (!rows.has(rowY)) rows.set(rowY, new Map());
     rows.get(rowY).set(toCell(n.x()), n);
   });
 
-  // Buscar 10 contiguas
+  // Preferir 10 contiguas
   rows.forEach((mapX, rowY)=>{
     const xs = Array.from(mapX.keys()).sort((a,b)=>a-b);
     for (let i=0; i<=xs.length-10; i++){
@@ -380,13 +358,13 @@ function composeTensInZone() {
     }
   });
 
-  // Si no hay 10 contiguas, 10 cualesquiera dentro
+  // Si no hay 10 contiguas, 10 cualesquiera
   if (!changed) {
     const pool=[];
     pieceLayer.getChildren().forEach(n=>{
       const t=n.name()||n.getAttr('btype');
       if (t!=='unit') return;
-      if (isInsideZone(n, zoneTenRect)) pool.push(n);
+      if (centerInZone(n, zoneTenRect)) pool.push(n);
     });
     if (pool.length>=10){
       const anchor = snap(pool[0].x(), pool[0].y());
@@ -396,10 +374,7 @@ function composeTensInZone() {
     }
   }
 
-  if (changed) {
-    reorderTensZone();
-    pieceLayer.draw();
-  }
+  if (changed) { reorderTensZone(); pieceLayer.draw(); }
   return changed;
 }
 
@@ -413,7 +388,7 @@ function composeHundredsInZone() {
     pieceLayer.getChildren().forEach(n=>{
       const t=n.name()||n.getAttr('btype');
       if (t!=='unit') return;
-      if (isInsideZone(n, zoneHundRect)) units.push(n);
+      if (centerInZone(n, zoneHundRect)) units.push(n);
     });
     if (units.length < 10) break;
     const anchor = snap(units[0].x(), units[0].y());
@@ -427,7 +402,7 @@ function composeHundredsInZone() {
     pieceLayer.getChildren().forEach(n=>{
       const t=n.name()||n.getAttr('btype');
       if (t!=='ten') return;
-      if (isInsideZone(n, zoneHundRect)) tens.push(n);
+      if (centerInZone(n, zoneHundRect)) tens.push(n);
     });
     if (tens.length < 10) break;
     const anchor = snap(tens[0].x(), tens[0].y());
@@ -436,10 +411,7 @@ function composeHundredsInZone() {
     changed = true;
   }
 
-  if (changed) {
-    reorderHundredsZone();
-    pieceLayer.draw();
-  }
+  if (changed) { reorderHundredsZone(); pieceLayer.draw(); }
   return changed;
 }
 
@@ -450,11 +422,9 @@ function checkBuildZones() {
     if (composeTensInZone())     changed = true;
     if (composeHundredsInZone()) changed = true;
   } while (changed);
-
-  // Siempre reordenar si hay algo dentro
+  // Reordenado final por si quedaron restos
   reorderTensZone();
   reorderHundredsZone();
-
   updateStatus();
 }
 
