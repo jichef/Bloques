@@ -1,224 +1,206 @@
-// ===== Parámetros y fixes =====
+// script.js — Bloques interactivos con Konva
+
 const GRID = 32;
 const UNIT_SIZE = GRID;
 const COLORS = { unit: "blue", ten: "red", hundred: "green" };
-const GRID_COLOR = "#c7c7c7";
-const DOUBLE_TAP_MS = 300;
-Konva.pixelRatio = 1;
 
-// ===== Stage y capas =====
 const stage = new Konva.Stage({
   container: "container",
   width: window.innerWidth,
-  height: window.innerHeight,
+  height: window.innerHeight * 0.7,
 });
-const gridLayer = new Konva.Layer({ listening: false });
+
 const layer = new Konva.Layer();
-stage.add(gridLayer);
 stage.add(layer);
 
-// ===== Utilidades =====
-const toCell = (n) => Math.round(n / GRID) * GRID;
-const snapToGrid = (x, y) => ({ x: toCell(x), y: toCell(y) });
-function speak(t){ try{ const u=new SpeechSynthesisUtterance(t); u.lang="es-ES"; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{} }
-const centerPos = () => ({ x: toCell(stage.width()/2), y: toCell(stage.height()/2) });
-
-// ===== Cuadrícula =====
-function drawGrid() {
-  gridLayer.destroyChildren();
-  const w = stage.width(), h = stage.height();
-  for (let x = 0; x <= w; x += GRID) {
-    const X = Math.round(x) + 0.5;
-    gridLayer.add(new Konva.Line({ points: [X,0,X,h], stroke: GRID_COLOR, strokeWidth: 1, listening:false }));
-  }
-  for (let y = 0; y <= h; y += GRID) {
-    const Y = Math.round(y) + 0.5;
-    gridLayer.add(new Konva.Line({ points: [0,Y,w,Y], stroke: GRID_COLOR, strokeWidth: 1, listening:false }));
-  }
-  gridLayer.draw();
+// --- Utilidades de cuadrícula
+function snapToGrid(x, y) {
+  return {
+    x: Math.round(x / GRID) * GRID,
+    y: Math.round(y / GRID) * GRID,
+  };
 }
 
-// ===== Estado y descomposición =====
-function countAll(){
-  let units=0,tens=0,hundreds=0;
-  layer.children.each(n=>{
-    const t=n.getAttr("btype");
-    if(t==="unit") units++;
-    else if(t==="ten") tens++;
-    else if(t==="hundred") hundreds++;
+// --- Crear bloques
+function createUnit(x, y) {
+  const p = snapToGrid(x, y);
+  const rect = new Konva.Rect({
+    x: p.x,
+    y: p.y,
+    width: UNIT_SIZE,
+    height: UNIT_SIZE,
+    fill: COLORS.unit,
+    draggable: true,
+    name: "unit",
   });
-  return { units,tens,hundreds,total: units + 10*tens + 100*hundreds };
-}
-function updateStatus(){
-  const {units,tens,hundreds,total}=countAll();
-  document.getElementById("status").innerText =
-    `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
-  const b=document.getElementById("breakdown");
-  if(b){
-    b.innerHTML = `
-      <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
-      <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
-      <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
-      <div class="label">Total</div><div class="value">${total}</div>`;
-  }
+  rect.setAttr("btype", "unit");
+  commonDragBehavior(rect);
+  layer.add(rect);
+  layer.draw();
+  updateStatus();
 }
 
-// ===== Interacción piezas =====
-function commonDragBehavior(shape){
-  shape.on("dragend", ()=>{
-    shape.position(snapToGrid(shape.x(), shape.y()));
-    layer.draw(); updateStatus();
+function createTen(x, y) {
+  const p = snapToGrid(x, y);
+  const rect = new Konva.Rect({
+    x: p.x,
+    y: p.y,
+    width: 10 * GRID,
+    height: GRID,
+    fill: COLORS.ten,
+    draggable: true,
+    name: "ten",
   });
-}
-function addDoubleTapHandler(shape, onDT){
-  let lastTap=0,lastClick=0;
-  shape.on("pointerdown", ()=>{ const now=Date.now(); if(now-lastTap<DOUBLE_TAP_MS) onDT(); lastTap=now; });
-  shape.on("dblclick", onDT);
-  shape.on("click", ()=>{ const now=Date.now(); if(now-lastClick<DOUBLE_TAP_MS) onDT(); lastClick=now; });
-}
-
-function createUnit(x,y){
-  const p=snapToGrid(x,y);
-  const rect=new Konva.Rect({ x:p.x,y:p.y,width:UNIT_SIZE,height:UNIT_SIZE,fill:COLORS.unit,draggable:true,strokeEnabled:false });
-  rect.setAttr("btype","unit");
+  rect.setAttr("btype", "ten");
   commonDragBehavior(rect);
-  layer.add(rect); layer.draw(); updateStatus();
-}
-function createTen(x,y){
-  const p=snapToGrid(x,y);
-  const rect=new Konva.Rect({ x:p.x,y:p.y,width:10*GRID,height:GRID,fill:COLORS.ten,draggable:true,strokeEnabled:false });
-  rect.setAttr("btype","ten");
-  commonDragBehavior(rect);
-  addDoubleTapHandler(rect, ()=>{
-    const start=snapToGrid(rect.x(), rect.y());
+  addDoubleTapHandler(rect, () => {
+    const start = snapToGrid(rect.x(), rect.y());
     rect.destroy();
-    for(let k=0;k<10;k++) createUnit(start.x + k*GRID, start.y);
-    layer.draw(); updateStatus();
+    for (let k = 0; k < 10; k++) createUnit(start.x + k * GRID, start.y);
+    layer.draw();
+    updateStatus();
   });
-  layer.add(rect); layer.draw(); updateStatus();
+  layer.add(rect);
+  layer.draw();
+  updateStatus();
 }
-function createHundred(x,y){
-  const p=snapToGrid(x,y);
-  const rect=new Konva.Rect({ x:p.x,y:p.y,width:10*GRID,height:10*GRID,fill:COLORS.hundred,draggable:true,strokeEnabled:false });
-  rect.setAttr("btype","hundred");
+
+function createHundred(x, y) {
+  const p = snapToGrid(x, y);
+  const rect = new Konva.Rect({
+    x: p.x,
+    y: p.y,
+    width: 10 * GRID,
+    height: 10 * GRID,
+    fill: COLORS.hundred,
+    draggable: true,
+    name: "hundred",
+  });
+  rect.setAttr("btype", "hundred");
   commonDragBehavior(rect);
-  addDoubleTapHandler(rect, ()=>{
-    const start=snapToGrid(rect.x(), rect.y());
+  addDoubleTapHandler(rect, () => {
+    const start = snapToGrid(rect.x(), rect.y());
     rect.destroy();
-    for(let r=0;r<10;r++) createTen(start.x, start.y + r*GRID);
-    layer.draw(); updateStatus();
+    for (let r = 0; r < 10; r++) createTen(start.x, start.y + r * GRID);
+    layer.draw();
+    updateStatus();
   });
-  layer.add(rect); layer.draw(); updateStatus();
+  layer.add(rect);
+  layer.draw();
+  updateStatus();
 }
 
-// ===== Composición automática =====
-function indexByGrid(){
-  const m=new Map();
-  layer.children.each(n=>{
-    const t=n.getAttr("btype"); if(!t) return;
-    const p=snapToGrid(n.x(),n.y());
-    m.set(`${p.x},${p.y}`, n);
+// --- Comportamientos comunes
+function commonDragBehavior(rect) {
+  rect.on("dragend", () => {
+    const p = snapToGrid(rect.x(), rect.y());
+    rect.position(p);
+    layer.draw();
+    updateStatus();
   });
-  return m;
 }
-function removeNodes(nodes){ nodes.forEach(n=>n.destroy()); }
-function tryComposeTensFromUnits(grid){
-  const composed=[];
-  grid.forEach((node,key)=>{
-    if(node.getAttr("btype")!=="unit") return;
-    const [xs,ys]=key.split(","); const x0=+xs,y0=+ys;
-    const seq=[];
-    for(let k=0;k<10;k++){
-      const n=grid.get(`${x0+k*GRID},${y0}`);
-      if(!n || n.getAttr("btype")!=="unit") return;
-      seq.push(n);
+
+function addDoubleTapHandler(shape, callback) {
+  let lastTap = 0;
+  shape.on("touchend", () => {
+    const now = Date.now();
+    if (now - lastTap < 300) callback();
+    lastTap = now;
+  });
+  shape.on("dblclick", callback);
+}
+
+// --- Contar bloques
+function countAll() {
+  let units = 0,
+    tens = 0,
+    hundreds = 0;
+  layer.find("Rect").forEach((n) => {
+    const t = n.name();
+    if (t === "unit") units++;
+    else if (t === "ten") tens++;
+    else if (t === "hundred") hundreds++;
+  });
+  return { units, tens, hundreds, total: units + 10 * tens + 100 * hundreds };
+}
+
+// --- Actualizar estado y descomposición
+function updateStatus() {
+  const { units, tens, hundreds, total } = countAll();
+  document.getElementById(
+    "status"
+  ).innerText = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
+
+  document.getElementById("desc-hundreds").innerText = `${hundreds} × 100 = ${
+    hundreds * 100
+  }`;
+  document.getElementById("desc-tens").innerText = `${tens} × 10 = ${
+    tens * 10
+  }`;
+  document.getElementById("desc-units").innerText = `${units} × 1 = ${units}`;
+  document.getElementById("desc-total").innerText = total;
+}
+
+// --- Construir decenas y centenas automáticas
+function autoCompose() {
+  let { units, tens } = countAll();
+  if (units >= 10) {
+    const u = layer.findOne(".unit");
+    if (u) {
+      const start = snapToGrid(u.x(), u.y());
+      // destruye 10 unidades
+      let removed = 0;
+      layer.find(".unit").forEach((uu) => {
+        if (removed < 10) {
+          uu.destroy();
+          removed++;
+        }
+      });
+      createTen(start.x, start.y);
     }
-    composed.push({x:x0,y:y0,nodes:seq});
-  });
-  composed.forEach(({x,y,nodes})=>{
-    if(nodes.some(n=>n.destroyed())) return;
-    removeNodes(nodes); createTen(x,y);
-  });
-  return composed.length>0;
-}
-function tryComposeHundredsFromTens(grid){
-  const composed=[];
-  grid.forEach((node,key)=>{
-    if(node.getAttr("btype")!=="ten") return;
-    const [xs,ys]=key.split(","); const x0=+xs,y0=+ys;
-    const seq=[];
-    for(let r=0;r<10;r++){
-      const n=grid.get(`${x0},${y0+r*GRID}`);
-      if(!n || n.getAttr("btype")!=="ten") return;
-      seq.push(n);
+  } else if (tens >= 10) {
+    const t = layer.findOne(".ten");
+    if (t) {
+      const start = snapToGrid(t.x(), t.y());
+      let removed = 0;
+      layer.find(".ten").forEach((tt) => {
+        if (removed < 10) {
+          tt.destroy();
+          removed++;
+        }
+      });
+      createHundred(start.x, start.y);
     }
-    composed.push({x:x0,y:y0,nodes:seq});
-  });
-  composed.forEach(({x,y,nodes})=>{
-    if(nodes.some(n=>n.destroyed())) return;
-    removeNodes(nodes); createHundred(x,y);
-  });
-  return composed.length>0;
-}
-function tryComposeHundredsFromUnits(grid){
-  const composed=[];
-  grid.forEach((node,key)=>{
-    if(node.getAttr("btype")!=="unit") return;
-    const [xs,ys]=key.split(","); const x0=+xs,y0=+ys;
-    const all=[];
-    for(let r=0;r<10;r++){
-      for(let c=0;c<10;c++){
-        const n=grid.get(`${x0+c*GRID},${y0+r*GRID}`);
-        if(!n || n.getAttr("btype")!=="unit") return;
-        all.push(n);
-      }
-    }
-    composed.push({x:x0,y:y0,nodes:all});
-  });
-  composed.forEach(({x,y,nodes})=>{
-    if(nodes.some(n=>n.destroyed())) return;
-    removeNodes(nodes); createHundred(x,y);
-  });
-  return composed.length>0;
-}
-function autoCompose(){
-  let changed=false;
-  do{
-    changed=false;
-    let grid=indexByGrid(); if(tryComposeTensFromUnits(grid)) changed=true;
-    grid=indexByGrid(); if(tryComposeHundredsFromTens(grid)) changed=true;
-    grid=indexByGrid(); if(tryComposeHundredsFromUnits(grid)) changed=true;
-  }while(changed);
-  layer.draw(); updateStatus();
+  }
+  updateStatus();
 }
 
-// ===== Panel =====
-function togglePanel(){
-  const panel=document.getElementById("panel");
-  const btn=document.getElementById("panel-toggle");
-  const open=panel.classList.toggle("open");
-  if(open) panel.classList.remove("closed");
-  btn.textContent=open?"⬇︎ Ocultar detalles":"⬆︎ Detalles";
-  btn.setAttribute("aria-expanded", String(open));
-  panel.setAttribute("aria-hidden", String(!open));
-}
+// --- Botones
+document.getElementById("btn-unit").onclick = () =>
+  createUnit(stage.width() / 2, stage.height() / 2);
+document.getElementById("btn-ten").onclick = () =>
+  createTen(stage.width() / 2, stage.height() / 2);
+document.getElementById("btn-hundred").onclick = () =>
+  createHundred(stage.width() / 2, stage.height() / 2);
+document.getElementById("btn-compose").onclick = autoCompose;
+document.getElementById("btn-clear").onclick = () => {
+  layer.destroyChildren();
+  layer.draw();
+  updateStatus();
+};
 
-// ===== Enlazar botones (ejecutado inmediatamente porque usamos 'defer') =====
-(function wireUI(){
-  const $ = (id) => document.getElementById(id);
-  $("btn-unit").addEventListener("click", ()=>{ const c=centerPos(); createUnit(c.x,c.y); });
-  $("btn-ten").addEventListener("click",  ()=>{ const c=centerPos(); createTen(c.x-5*GRID,c.y); });
-  $("btn-hundred").addEventListener("click", ()=>{ const c=centerPos(); createHundred(c.x-5*GRID,c.y-5*GRID); });
-  $("btn-clear").addEventListener("click", ()=>{ layer.destroyChildren(); layer.draw(); updateStatus(); });
-  $("btn-compose").addEventListener("click", autoCompose);
-  $("btn-say").addEventListener("click", ()=>{ const {units,tens,hundreds,total}=countAll(); speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}.`); });
-  $("btn-challenge").addEventListener("click", ()=>{ const target=Math.floor(Math.random()*900)+100; $("challenge").textContent=`Forma el número ${target}`; speak(`Reto: forma el número ${target}`); });
-  $("panel-toggle").addEventListener("click", togglePanel);
-  console.log("UI conectada ✅");
-})();
+// --- Leer número
+document.getElementById("btn-read").onclick = () => {
+  const { total } = countAll();
+  const utter = new SpeechSynthesisUtterance(total.toString());
+  speechSynthesis.speak(utter);
+};
 
-// ===== Resize & arranque =====
-function resize(){ stage.width(window.innerWidth); stage.height(window.innerHeight); drawGrid(); layer.draw(); }
-window.addEventListener("resize", resize);
-drawGrid();
+// --- Reto aleatorio
+document.getElementById("btn-challenge").onclick = () => {
+  const num = Math.floor(Math.random() * 200) + 1;
+  alert("Forma el número " + num);
+};
+
+// --- Inicial
 updateStatus();
