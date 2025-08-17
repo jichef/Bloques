@@ -2,16 +2,14 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Bloques Web</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- Konva.js -->
   <script src="https://unpkg.com/konva@9/konva.min.js"></script>
 </head>
 <body>
+  <!-- Controles fijos arriba -->
   <div id="controls">
     <div class="row">
       <button onclick="addUnit()">➕ Unidad</button>
@@ -25,10 +23,31 @@
       <button onclick="newChallenge()">🎯 Reto</button>
       <span id="challenge"></span>
     </div>
-    <div id="status"></div>
+    <!-- Resumen compacto siempre visible -->
+    <div id="status">Total: 0 — 0 centenas, 0 decenas, 0 unidades</div>
   </div>
 
+  <!-- Lienzo -->
   <div id="container"></div>
+
+  <!-- Panel desplegable inferior con descomposición detallada -->
+  <div id="panel" class="closed" aria-hidden="true">
+    <button id="panel-toggle" onclick="togglePanel()" aria-expanded="false">
+      ⬆︎ Detalles
+    </button>
+    <div id="panel-content">
+      <h3>Descomposición</h3>
+      <div id="breakdown">
+        <!-- Se rellena dinámicamente -->
+      </div>
+      <h4>Consejos</h4>
+      <ul>
+        <li>Doble toque en <b>centena</b> ⇒ 10 decenas.</li>
+        <li>Doble toque en <b>decena</b> ⇒ 10 unidades.</li>
+        <li>Usa <b>🧩 Construir</b> para agrupar automáticamente.</li>
+      </ul>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>
