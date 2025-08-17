@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.8.2: conteo robusto desde stage) =====
-console.log("Bloques v16.8.2");
+// ===== Bloques — script.js (v16.8.4: conteo fiable + bugfix + voz 2 pasos) =====
+console.log("Bloques v16.8.4");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -137,23 +137,11 @@ function drawZones() {
   uiLayer.draw();
 }
 
-// ----- Helpers de piezas (robusto) -----
-function getPieceGroups(){
-  const out = [];
-  stage.find('Group').each(g=>{
-    const t = g.name && g.name() || g.getAttr && g.getAttr('btype');
-    if (t === 'unit' || t === 'ten' || t === 'hundred') out.push(g);
-  });
-  return out;
-}
-
-// ----- Contador + descomposición -----
-// ----- Contador + descomposición (robusto con selectores) -----
+// ----- Contador (selectores fiables) -----
 function countAll(){
-  // Selecciona solo Groups con name 'unit' / 'ten' / 'hundred'
-  const units    = pieceLayer.find('Group.unit').length;
-  const tens     = pieceLayer.find('Group.ten').length;
-  const hundreds = pieceLayer.find('Group.hundred').length;
+  const units    = pieceLayer.find('Group[name=unit]').length;
+  const tens     = pieceLayer.find('Group[name=ten]').length;
+  const hundreds = pieceLayer.find('Group[name=hundred]').length;
   return { units, tens, hundreds, total: units + 10*tens + 100*hundreds };
 }
 
@@ -173,10 +161,13 @@ function numEnLetras(n){
 
 // ---- Voz en 2 pasos ----
 function hablarDescompYLetras(h,t,u,total,pausaMs=1000){
-  const partes=[]; if(h>0)partes.push(`${h} ${h===1?'centena':'centenas'}`); if(t>0)partes.push(`${t} ${t===1?'decena':'decenas'}`); if(u>0)partes.push(`${u} ${u===1?'unidad':'unidades'}`);
+  const partes=[];
+  if(h>0)partes.push(`${h} ${h===1?'centena':'centenas'}`);
+  if(t>0)partes.push(`${t} ${t===1?'decena':'decenas'}`);
+  if(u>0)partes.push(`${u} ${u===1?'unidad':'unidades'}`);
   const letras=numEnLetras(total);
   if (partes.length===0){ speak(letras); return; }
-  let descomp = partes.length===1 ? partes[0] : (partes.length===2 ? partes.join(' y ') : partes.slice(0,-1).join(', ')+' y '+partes.slice(-1));
+  const descomp = partes.length===1 ? partes[0] : (partes.length===2 ? partes.join(' y ') : partes.slice(0,-1).join(', ')+' y '+partes.slice(-1));
   try{
     speechSynthesis.cancel();
     const u1=new SpeechSynthesisUtterance(`Tienes ${descomp}`); u1.lang='es-ES';
@@ -204,6 +195,7 @@ function updateStatus(){
       <div class="label">En letras</div><div class="value">${enLetras}</div>`;
   }
 
+  // ✅ Acierto de reto
   if (challengeNumber !== null && total === challengeNumber) {
     const ch = document.getElementById('challenge');
     const msg = `🎉 ¡Correcto! Has formado ${enLetras}`;
@@ -218,9 +210,8 @@ function reorderTensZone(){
   if (!zoneTenRect) return;
   const z = ZONES.tens;
   const units = [];
-  getPieceGroups().forEach(g=>{
-    const t=g.name()||g.getAttr('btype');
-    if (t==='unit' && centerInZone(g, zoneTenRect)) units.push(g);
+  pieceLayer.find('Group[name=unit]').each(g=>{
+    if (centerInZone(g, zoneTenRect)) units.push(g);
   });
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   units.forEach((g,i)=>{ g.position(snap(z.x + Math.min(i,9)*GRID, z.y)); });
@@ -231,8 +222,8 @@ function reorderHundredsZone(){
   if (!zoneHundRect) return;
   const z = ZONES.hund;
   const tens=[], units=[];
-  getPieceGroups().forEach(g=>{
-    const t=g.name()||g.getAttr('btype');
+  pieceLayer.find('Group').each(g=>{
+    const t=g.name();
     if (!centerInZone(g, zoneHundRect)) return;
     if (t==='ten') tens.push(g); else if (t==='unit') units.push(g);
   });
@@ -250,6 +241,7 @@ function onDragEnd(group){
   group.on("dragend", ()=>{
     group.position(snap(group.x(), group.y()));
     const type = group.name() || group.getAttr('btype');
+
     if (zoneTenRect && type==='unit' && intersectsZone(group, zoneTenRect)) {
       group.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); checkBuildZones();
     }
@@ -277,8 +269,10 @@ function createUnit(x,y){
   const g=new Konva.Group({ x:toCell(x), y:toCell(y), draggable:true, name:'unit' });
   g.setAttr('btype','unit'); addChipRectTo(g, GRID, GRID, COLORS.unit); onDragEnd(g);
   pieceLayer.add(g); pieceLayer.draw();
+
   if (zoneTenRect && intersectsZone(g, zoneTenRect)) { g.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); }
   if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
+
   checkBuildZones(); updateStatus(); return g;
 }
 function createTen(x,y){
@@ -286,7 +280,10 @@ function createTen(x,y){
   g.setAttr('btype','ten'); addChipRectTo(g, 10*GRID, GRID, COLORS.ten); onDragEnd(g);
   onDouble(g, ()=>{ const start=snap(g.x(), g.y()); g.destroy(); for(let k=0;k<10;k++) createUnit(start.x + k*GRID, start.y); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
   pieceLayer.add(g); pieceLayer.draw();
-  if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.h.y)); reorderHundredsZone(); }
+
+  // 🔧 bugfix: ZONES.hund.y (antes estaba mal escrito)
+  if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
+
   checkBuildZones(); updateStatus(); return g;
 }
 function createHundred(x,y){
@@ -301,9 +298,8 @@ function composeTensInZone() {
   if (!zoneTenRect) return false;
   let changed = false;
   const rows = new Map();
-  getPieceGroups().forEach(n=>{
-    const t = n.name()||n.getAttr('btype');
-    if (t!=='unit' || !centerInZone(n, zoneTenRect)) return;
+  pieceLayer.find('Group[name=unit]').each(n=>{
+    if (!centerInZone(n, zoneTenRect)) return;
     const rowY = toCell(n.y());
     if (!rows.has(rowY)) rows.set(rowY, new Map());
     rows.get(rowY).set(toCell(n.x()), n);
@@ -316,7 +312,7 @@ function composeTensInZone() {
     }
   });
   if (!changed) {
-    const pool=[]; getPieceGroups().forEach(n=>{ const t=n.name()||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneTenRect)) pool.push(n); });
+    const pool=[]; pieceLayer.find('Group[name=unit]').each(n=>{ if (centerInZone(n, zoneTenRect)) pool.push(n); });
     if (pool.length>=10){ const anchor=snap(pool[0].x(), pool[0].y()); for (let i=0;i<10;i++) pool[i].destroy(); createTen(anchor.x, anchor.y); changed = true; }
   }
   if (changed) { reorderTensZone(); pieceLayer.draw(); }
@@ -325,22 +321,25 @@ function composeTensInZone() {
 function composeHundredsInZone() {
   if (!zoneHundRect) return false;
   let changed = false;
+
   while (true) {
-    const units=[]; getPieceGroups().forEach(n=>{ const t=n.name()||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneHundRect)) units.push(n); });
+    const units=[]; pieceLayer.find('Group[name=unit]').each(n=>{ if (centerInZone(n, zoneHundRect)) units.push(n); });
     if (units.length < 10) break;
     const anchor = snap(units[0].x(), units[0].y()); for (let i=0;i<10;i++) units[i].destroy(); createTen(anchor.x, anchor.y); changed = true;
   }
   while (true) {
-    const tens=[]; getPieceGroups().forEach(n=>{ const t=n.name()||n.getAttr('btype'); if (t==='ten' && centerInZone(n, zoneHundRect)) tens.push(n); });
+    const tens=[]; pieceLayer.find('Group[name=ten]').each(n=>{ if (centerInZone(n, zoneHundRect)) tens.push(n); });
     if (tens.length < 10) break;
     const anchor = snap(tens[0].x(), tens[0].y()); for (let i=0;i<10;i++) tens[i].destroy(); createHundred(anchor.x, anchor.y); changed = true;
   }
+
   if (changed) { reorderHundredsZone(); pieceLayer.draw(); }
   return changed;
 }
 function checkBuildZones() {
   let changed;
-  do { changed = false;
+  do {
+    changed = false;
     if (composeTensInZone())     changed = true;
     if (composeHundredsInZone()) changed = true;
   } while (changed);
@@ -358,7 +357,7 @@ function wireUI(){
   $('btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); });
   $('btn-compose')?.addEventListener('click', ()=>{ checkBuildZones(); });
 
-  // 🔊 Leer número
+  // 🔊 Leer número (descomposición -> pausa -> número en letras)
   $('btn-say')?.addEventListener('click', ()=>{
     const {units,tens,hundreds,total}=countAll();
     if (total === 0) return;
@@ -392,7 +391,13 @@ function wireUI(){
 // ----- Pan & Zoom -----
 let isPanning=false, lastPointerPos=null;
 stage.on('mousedown touchstart', (e)=>{ if (e.target && e.target.getLayer && e.target.getLayer() === pieceLayer) return; isPanning=true; lastPointerPos=stage.getPointerPosition(); });
-stage.on('mousemove touchmove', ()=>{ if(!isPanning) return; const pos=stage.getPointerPosition(); if(!pos||!lastPointerPos) return; const dx=pos.x-lastPointerPos.x, dy=pos.y-lastPointerPos.y; world.x+=dx; world.y+=dy; applyWorldTransform(); lastPointerPos=pos; });
+stage.on('mousemove touchmove', ()=>{
+  if(!isPanning) return;
+  const pos=stage.getPointerPosition();
+  if(!pos||!lastPointerPos) return;
+  const dx=pos.x-lastPointerPos.x, dy=pos.y-lastPointerPos.y;
+  world.x+=dx; world.y+=dy; applyWorldTransform(); lastPointerPos=pos;
+});
 stage.on('mouseup touchend', ()=>{ isPanning=false; lastPointerPos=null; });
 stage.on('wheel', (e)=>{ e.evt.preventDefault(); const old=world.scale; const p=stage.getPointerPosition(); const m={x:(p.x-world.x)/old,y:(p.y-world.y)/old}; let s=e.evt.deltaY>0?old/SCALE_BY:old*SCALE_BY; s=Math.max(SCALE_MIN,Math.min(SCALE_MAX,s)); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform(); });
 stage.on('dblclick dbltap', ()=>{ const p=stage.getPointerPosition(); const old=world.scale; const m={x:(p.x-world.x)/old,y:(p.y-world.y)/old}; let s=Math.min(SCALE_MAX, old*1.25); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform(); });
