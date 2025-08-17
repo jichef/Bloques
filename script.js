@@ -529,6 +529,26 @@ stage.on('dblclick dbltap', ()=>{
   applyWorldTransform();
 });
 
+// === Leer número en voz ===
+function leerNumero() {
+  const units = blocks.filter(b => b.type === 'unit').length;
+  const tens = blocks.filter(b => b.type === 'ten').length;
+  const hundreds = blocks.filter(b => b.type === 'hundred').length;
+  const total = units + tens * 10 + hundreds * 100;
+
+  const texto = numeroALetras(total);
+
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance(texto);
+    utterance.lang = 'es-ES';
+    speechSynthesis.speak(utterance);
+  } else {
+    alert("Tu navegador no soporta síntesis de voz.");
+  }
+}
+
+// Conectar botón
+document.getElementById("btn-say").addEventListener("click", leerNumero);
 // ----- Resize & arranque -----
 function relayout(){
   stage.width(window.innerWidth);
