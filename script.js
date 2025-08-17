@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.6: letras ES nativo + fixes) =====
-console.log("Bloques v16.6");
+// ===== Bloques — script.js (v16.7: voz sin ceros + frase natural) =====
+console.log("Bloques v16.7");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -214,6 +214,25 @@ function numEnLetras(n){
     return milesTxt + ' ' + _0_999(r);
   }
   return String(n);
+}
+
+// ---- Frase de voz sin ceros y con “y” natural ----
+function fraseVoz(h, t, u, total){
+  const partes = [];
+  if (h > 0) partes.push(`${h} ${h === 1 ? 'centena' : 'centenas'}`);
+  if (t > 0) partes.push(`${t} ${t === 1 ? 'decena' : 'decenas'}`);
+  if (u > 0) partes.push(`${u} ${u === 1 ? 'unidad' : 'unidades'}`);
+
+  // Une con comas y “y” antes del último elemento
+  let descomp = '';
+  if (partes.length === 1) descomp = partes[0];
+  else if (partes.length === 2) descomp = partes.join(' y ');
+  else if (partes.length >= 3) descomp = partes.slice(0, -1).join(', ') + ' y ' + partes.slice(-1);
+
+  const letras = numEnLetras(total);
+  if (descomp) return `Tienes ${descomp} — ${letras}`;
+  // Si todo es 0, solo dicen el total en letras (aunque normalmente ni se llama)
+  return letras;
 }
 
 function updateStatus(){
@@ -484,11 +503,12 @@ function wireUI(){
   $('btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); });
   $('btn-compose')?.addEventListener('click', ()=>{ checkBuildZones(); });
 
-  // 🔊 Leer número (usa countAll + numEnLetras)
+  // 🔊 Leer número (omitir ceros y sin duplicar)
   $('btn-say')?.addEventListener('click', ()=>{
     const {units,tens,hundreds,total}=countAll();
-    const enLetras = numEnLetras(total);
-    speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}. ${enLetras}.`);
+    if (total === 0) return;
+    const frase = fraseVoz(hundreds, tens, units, total);
+    speak(frase);
   });
 
   $('btn-challenge')?.addEventListener('click', ()=>{
