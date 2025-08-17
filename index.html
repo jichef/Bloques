@@ -6,36 +6,30 @@
         content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Bloques Web</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- Cargar Konva antes de script.js -->
+  <!-- Konva primero -->
   <script src="https://unpkg.com/konva@9/konva.min.js"></script>
 </head>
 <body>
-  <!-- Controles fijos arriba -->
   <div id="controls">
     <div class="row">
-      <button onclick="addUnit()">➕ Unidad</button>
-      <button onclick="addTen()">➕ Decena</button>
-      <button onclick="addHundred()">➕ Centena</button>
-      <button onclick="autoCompose()">🧩 Construir</button>
-      <button onclick="clearAll()">🧹 Limpiar</button>
+      <button id="btn-unit">➕ Unidad</button>
+      <button id="btn-ten">➕ Decena</button>
+      <button id="btn-hundred">➕ Centena</button>
+      <button id="btn-compose">🧩 Construir</button>
+      <button id="btn-clear">🧹 Limpiar</button>
     </div>
     <div class="row">
-      <button onclick="sayCurrent()">🔊 Leer número</button>
-      <button onclick="newChallenge()">🎯 Reto</button>
+      <button id="btn-say">🔊 Leer número</button>
+      <button id="btn-challenge">🎯 Reto</button>
       <span id="challenge"></span>
     </div>
-    <!-- Resumen compacto siempre visible -->
     <div id="status">Total: 0 — 0 centenas, 0 decenas, 0 unidades</div>
   </div>
 
-  <!-- Lienzo principal -->
   <div id="container"></div>
 
-  <!-- Panel desplegable inferior -->
   <div id="panel" class="closed" aria-hidden="true">
-    <button id="panel-toggle" onclick="togglePanel()" aria-expanded="false">
-      ⬆︎ Detalles
-    </button>
+    <button id="panel-toggle" aria-expanded="false">⬆︎ Detalles</button>
     <div id="panel-content">
       <h3>Descomposición</h3>
       <div id="breakdown">
@@ -53,7 +47,7 @@
     </div>
   </div>
 
-  <!-- Nuestro script principal -->
+  <!-- Nuestro JS al final (sin inline handlers) -->
   <script src="script.js"></script>
 </body>
 </html>
