@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.9.6: zonas ancladas al viewport + SPAWN visible sin solapes) =====
-console.log("Bloques v16.9.6");
+// ===== Bloques — script.js (v17.0.0: sumas y restas + zonas ancladas al viewport) =====
+console.log("Bloques v17.0.0");
 
 Konva.pixelRatio = 1;
 
@@ -180,7 +180,7 @@ function findSpawnRect(w,h){
     if (!overlapsAnyBox(box)) return box;
     advanceSpawn(w,h);
   }
-  // Ultimo recurso: esquina sup-dcha del viewport
+  // Último recurso: esquina sup-dcha del viewport
   const v=visibleWorldRect();
   return { x:toCell(v.x+v.w-w-GRID), y:toCell(v.y+GRID), w, h };
 }
@@ -220,25 +220,78 @@ function hablarDescompYLetras(h,t,u,total,pausa=1000){
   }catch{ speak(`Tienes ${descomp}`); setTimeout(()=>speak(letras), pausa); }
 }
 
-let challengeNumber=null;
-function updateStatus(){
-  const {units,tens,hundreds,total}=countAll();
-  const enLetras=numEnLetras(total);
-  const st=document.getElementById('status');
-  if(st) st.textContent=`Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades — (${enLetras})`;
-  const b=document.getElementById('breakdown');
-  if(b){
-    b.innerHTML = `
-      <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
-      <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
-      <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
-      <div class="label">Total</div><div class="value">${total}</div>
-      <div class="label">En letras</div><div class="value">${enLetras}</div>`;
+// ======= NUEVO: Operaciones (sumas/restas) =======
+let currentOp = null; // { kind:'sum'|'sub', a:number, b:number, target:number }
+
+function setChallengeText(text){
+  const el = document.getElementById('challenge');
+  if (el) el.textContent = text;
+}
+
+// Anclas de operandos y resultado, ancladas al viewport alrededor de la zona 10×10
+function operandAnchorsInView(){
+  const v = visibleWorldRect();
+  const H = ZONES.hund;
+  const gap = GRID*3;
+
+  const A = snap(H.x - GRID*14, H.y);             // A la izquierda de la 10×10
+  const B = snap(H.x + H.w + gap, H.y);           // A la derecha de la 10×10
+  const R = snap(H.x, H.y + H.h + gap);           // Debajo de la 10×10
+
+  // Asegurar que quedan dentro del viewport
+  const clamp = (p)=>({ x: Math.max(v.x+GRID, Math.min(p.x, v.x+v.w-GRID*12)),
+                        y: Math.max(v.y+GRID, Math.min(p.y, v.y+v.h-GRID*12)) });
+  return { A: clamp(A), B: clamp(B), R: clamp(R) };
+}
+
+// Coloca un número en bloque compacto SIN usar SPAWN (coordenadas absolutas)
+function placeNumberInBlock(n, anchorX, anchorY){
+  const tens  = Math.floor(n/10);
+  const units = n % 10;
+
+  // Decenas: en columna (espaciadas 2 celdas)
+  for (let i=0;i<tens;i++){
+    createTen(anchorX, anchorY + i*GRID*2);
   }
-  if(challengeNumber!==null && total===challengeNumber){
-    const ch=document.getElementById('challenge'); const msg=`🎉 ¡Correcto! Has formado ${enLetras}`;
-    if(ch) ch.textContent=msg; speak(msg); challengeNumber=null;
+
+  // Unidades: en fila debajo de las decenas
+  const baseY = anchorY + Math.max(1, tens*2)*GRID + GRID; // deja 1 fila de aire
+  for (let i=0;i<units;i++){
+    createUnit(anchorX + i*GRID, baseY);
   }
+}
+
+// Genera SUMA: limpia, coloca A y B, objetivo A+B
+function newSumChallenge(min=6, max=89){
+  pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase();
+
+  const a = Math.floor(Math.random()*(max-min+1))+min;
+  const b = Math.floor(Math.random()*(max-min+1))+min;
+  currentOp = { kind:'sum', a, b, target: a+b };
+
+  const pos = operandAnchorsInView();
+  placeNumberInBlock(a, pos.A.x, pos.A.y);
+  placeNumberInBlock(b, pos.B.x, pos.B.y);
+
+  setChallengeText(`➕ Suma: ${a} + ${b}  → Construye ${a+b}`);
+  speak(`Forma la suma ${a} más ${b}`);
+  updateStatus();
+}
+
+// Genera RESTA: limpia, coloca solo el minuendo A, objetivo A−B
+function newSubChallenge(){
+  pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase();
+
+  const a = Math.floor(Math.random()*70)+30; // 30..99
+  const b = Math.floor(Math.random()*Math.min(29,a-1))+1; // 1..min(29,a-1)
+  currentOp = { kind:'sub', a, b, target: a-b };
+
+  const pos = operandAnchorsInView();
+  placeNumberInBlock(a, pos.A.x, pos.A.y);
+
+  setChallengeText(`➖ Resta: ${a} − ${b}  → Deja ${a-b}`);
+  speak(`Resta ${b} a ${a}. Deja ${a-b}`);
+  updateStatus();
 }
 
 // ===== Reordenaciones/zonas de construcción =====
@@ -287,25 +340,30 @@ function onDouble(group, cb){
   group.on('click',       ()=>{ const now=Date.now(); if(now-lastClick<300) cb(); lastClick=now; });
 }
 
-// Crear piezas (usa SPAWN)
+// Crear piezas (usa SPAWN por defecto, pero para retos colocamos con coords absolutas)
 function addChipRectTo(g,w,h,fill){ g.add(new Konva.Rect({x:0,y:0,width:w,height:h,fill,...CHIP_STYLE})); }
 function createUnit(x,y){
   const w=GRID,h=GRID;
-  let pos = (x==null||y==null) ? snap(...Object.values(findSpawnRect(w,h))) : snap(x,y);
+  let pos;
   if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h); }
+  else { pos=snap(x,y); }
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'unit' }); g.setAttr('btype','unit'); addChipRectTo(g,w,h,COLORS.unit);
   onDragEnd(g); pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
 function createTen(x,y){
   const w=10*GRID,h=GRID;
-  let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
+  let pos;
+  if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h); }
+  else { pos=snap(x,y); }
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'ten' }); g.setAttr('btype','ten'); addChipRectTo(g,w,h,COLORS.ten);
   onDragEnd(g); onDouble(g, ()=>{ const start=snap(g.x(),g.y()); g.destroy(); for(let k=0;k<10;k++) createUnit(start.x+k*GRID, start.y); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
   pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
 function createHundred(x,y){
   const w=10*GRID,h=10*GRID;
-  let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
+  let pos;
+  if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h); }
+  else { pos=snap(x,y); }
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'hundred' }); g.setAttr('btype','hundred'); addChipRectTo(g,w,h,COLORS.hundred);
   onDragEnd(g); onDouble(g, ()=>{ const start=snap(g.x(),g.y()); g.destroy(); for(let row=0;row<10;row++) createTen(start.x, start.y+row*GRID); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
   pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
@@ -360,16 +418,56 @@ function checkBuildZones(){
   reorderTensZone(); reorderHundredsZone(); updateStatus();
 }
 
+// ======= Check de retos (incluye sumas/restas) =======
+let challengeNumber=null;
+function updateStatus(){
+  const {units,tens,hundreds,total}=countAll();
+  const enLetras=numEnLetras(total);
+  const st=document.getElementById('status');
+  if(st) st.textContent=`Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades — (${enLetras})`;
+  const b=document.getElementById('breakdown');
+  if(b){
+    b.innerHTML = `
+      <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
+      <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
+      <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
+      <div class="label">Total</div><div class="value">${total}</div>
+      <div class="label">En letras</div><div class="value">${enLetras}</div>`;
+  }
+  // Reto simple (número)
+  if(challengeNumber!==null && total===challengeNumber){
+    const ch=document.getElementById('challenge'); const msg=`🎉 ¡Correcto! Has formado ${enLetras}`;
+    if(ch) ch.textContent=msg; speak(msg); challengeNumber=null;
+  }
+  // Reto de operación
+  if (currentOp){
+    if (total === currentOp.target){
+      const msg = currentOp.kind==='sum'
+        ? `✅ ¡Bien! ${currentOp.a} + ${currentOp.b} = ${total}`
+        : `✅ ¡Bien! ${currentOp.a} − ${currentOp.b} = ${total}`;
+      setChallengeText(msg);
+      speak(msg);
+      currentOp = null; // fin de reto
+    }
+  }
+}
+
 // Botonera
 function wireUI(){
   const $=id=>document.getElementById(id);
   $('#btn-unit')   ?.addEventListener('click', ()=> createUnit());
   $('#btn-ten')    ?.addEventListener('click', ()=> createTen());
   $('#btn-hundred')?.addEventListener('click', ()=> createHundred());
-  $('#btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase(); });
+  $('#btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase(); currentOp=null; setChallengeText(''); challengeNumber=null; });
   $('#btn-compose')?.addEventListener('click', ()=> checkBuildZones());
+
+  // 🔢 Retos de suma/resta (opcional: añade botones en tu HTML con estos ids)
+  $('#btn-sum')?.addEventListener('click', ()=> newSumChallenge());
+  $('#btn-sub')?.addEventListener('click', ()=> newSubChallenge());
+
   $('#btn-say')?.addEventListener('click', ()=>{ const {units,tens,hundreds,total}=countAll(); if(total===0) return; hablarDescompYLetras(hundreds,tens,units,total,1100); });
   $('#btn-challenge')?.addEventListener('click', ()=>{
+    currentOp=null; // salir de modo operación
     challengeNumber=Math.floor(Math.random()*900)+1;
     const ch=document.getElementById('challenge'); if(ch) ch.textContent=`🎯 Forma el número: ${challengeNumber}`;
     speak(`Forma el número ${numEnLetras(challengeNumber)}`);
