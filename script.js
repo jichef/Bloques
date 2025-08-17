@@ -1,10 +1,10 @@
-// ===== Bloques — script.js (fix descomposición) =====
+// ====== Bloques — script.js (robusto) ======
 const GRID = 32;
 Konva.pixelRatio = 1;
 
 const COLORS = { unit: "#1f78ff", ten: "#ff3b30", hundred: "#2ecc71" };
 
-// ----- Stage y capas
+// ----- Stage y capas -----
 const stage = new Konva.Stage({
   container: "container",
   width: window.innerWidth,
@@ -15,16 +15,16 @@ const layer     = new Konva.Layer();
 stage.add(gridLayer);
 stage.add(layer);
 
-// ----- Cuadrícula
-function drawGrid(){
+// ----- Cuadrícula visible -----
+function drawGrid() {
   gridLayer.destroyChildren();
-  const w=stage.width(), h=stage.height();
+  const w = stage.width(), h = stage.height();
   for (let x=0; x<=w; x+=GRID){
-    const X=Math.round(x)+0.5;
+    const X = Math.round(x)+0.5;
     gridLayer.add(new Konva.Line({ points:[X,0,X,h], stroke:"#c7c7c7", strokeWidth:1 }));
   }
   for (let y=0; y<=h; y+=GRID){
-    const Y=Math.round(y)+0.5;
+    const Y = Math.round(y)+0.5;
     gridLayer.add(new Konva.Line({ points:[0,Y,w,Y], stroke:"#c7c7c7", strokeWidth:1 }));
   }
   gridLayer.draw();
@@ -36,81 +36,128 @@ window.addEventListener("resize", ()=>{
   drawGrid(); layer.draw();
 });
 
-// ----- Utils
+// ----- Utils -----
 const toCell = n => Math.round(n/GRID)*GRID;
 const snap   = (x,y)=>({x:toCell(x), y:toCell(y)});
 const center = ()=>({x:toCell(stage.width()/2), y:toCell(stage.height()/2)});
 
-// ----- Estado
-function countAll(){
-  let u=0,d=0,c=0;
-  layer.children.each(n=>{
-    const t=n.getAttr("btype");
-    if(t==="unit") u++;
-    else if(t==="ten") d++;
-    else if(t==="hundred") c++;
-  });
-  return { units:u, tens:d, hundreds:c, total:u+10*d+100*c };
-}
-function renderStatus(){
-  const {units,tens,hundreds,total}=countAll();
-  const st=document.getElementById("status");
-  if (st) st.textContent = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
-  const b=document.getElementById("breakdown");
-  if (b) b.innerHTML = `
-    <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
-    <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
-    <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
-    <div class="label">Total</div><div class="value">${total}</div>`;
+function speak(text){
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "es-ES";
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } catch {}
 }
 
-// ----- Helpers de eventos
+// ----- Contador + descomposición -----
+function countAll() {
+  let units=0, tens=0, hundreds=0;
+  // Contar por name; si no, por atributo
+  layer.find('Rect').each(n=>{
+    const name = n.name();
+    const t = name || n.getAttr('btype');
+    if (t === 'unit') units++;
+    else if (t === 'ten') tens++;
+    else if (t === 'hundred') hundreds++;
+  });
+  return { units, tens, hundreds, total: units + 10*tens + 100*hundreds };
+}
+
+function updateStatus() {
+  const {units, tens, hundreds, total} = countAll();
+
+  // Resumen superior
+  const statusEl = document.getElementById('status');
+  if (statusEl) statusEl.textContent =
+    `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
+
+  // Panel "breakdown" (nuevo)
+  const breakdown = document.getElementById('breakdown');
+  if (breakdown) {
+    breakdown.innerHTML = `
+      <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
+      <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
+      <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
+      <div class="label">Total</div><div class="value">${total}</div>`;
+  }
+
+  // Compatibilidad con IDs antiguos (desc-*)
+  const dh = document.getElementById('desc-hundreds');
+  const dt = document.getElementById('desc-tens');
+  const du = document.getElementById('desc-units');
+  const dT = document.getElementById('desc-total');
+  if (dh) dh.textContent = `${hundreds} × 100 = ${hundreds*100}`;
+  if (dt) dt.textContent = `${tens} × 10 = ${tens*10}`;
+  if (du) du.textContent = `${units} × 1 = ${units}`;
+  if (dT) dT.textContent = `${total}`;
+}
+
+// Llamar SIEMPRE que algo cambie
+layer.on('add', updateStatus);
+layer.on('destroy', updateStatus);
+stage.on('dragend', updateStatus);
+
+// ----- Comportamientos comunes -----
 function onDragEnd(shape){
   shape.on("dragend", ()=>{
     shape.position(snap(shape.x(), shape.y()));
-    layer.draw(); renderStatus();
-  });
-}
-function onDouble(shape, cb){
-  let lastTap=0,lastClick=0;
-  shape.on("pointerdown", ()=>{
-    const now=Date.now();
-    if(now-lastTap<300){ cb(); }
-    lastTap=now;
-  });
-  shape.on("dblclick", cb);
-  shape.on("click", ()=>{
-    const now=Date.now();
-    if(now-lastClick<300){ cb(); }
-    lastClick=now;
+    layer.draw(); updateStatus();
   });
 }
 
-// ----- Piezas
+// Doble gesto robusto: soporta dblclick + dbltap (Konva) y fallback
+function onDouble(shape, cb){
+  let lastTap = 0, lastClick = 0;
+
+  // Soporte nativo Konva para móvil
+  shape.on('dbltap', cb);
+  // Soporte nativo Konva para ratón
+  shape.on('dblclick', cb);
+
+  // Fallback por si el navegador no dispara alguno
+  shape.on('pointerdown', ()=>{
+    const now = Date.now();
+    if (now - lastTap < 300) cb();
+    lastTap = now;
+  });
+  shape.on('click', ()=>{
+    const now = Date.now();
+    if (now - lastClick < 300) cb();
+    lastClick = now;
+  });
+}
+
+// ----- Creación de piezas -----
 function createUnit(x,y){
-  const p=snap(x,y);
-  const r=new Konva.Rect({ x:p.x, y:p.y, width:GRID, height:GRID, fill:COLORS.unit, draggable:true });
-  r.setAttr("btype","unit");
+  const p = snap(x,y);
+  const r = new Konva.Rect({
+    x:p.x, y:p.y, width:GRID, height:GRID,
+    fill:COLORS.unit, draggable:true, name:'unit'
+  });
+  r.setAttr('btype','unit');
   onDragEnd(r);
   layer.add(r);
   return r;
 }
 
 function createTen(x,y){
-  const p=snap(x,y);
-  const r=new Konva.Rect({ x:p.x, y:p.y, width:10*GRID, height:GRID, fill:COLORS.ten, draggable:true });
-  r.setAttr("btype","ten");
+  const p = snap(x,y);
+  const r = new Konva.Rect({
+    x:p.x, y:p.y, width:10*GRID, height:GRID,
+    fill:COLORS.ten, draggable:true, name:'ten'
+  });
+  r.setAttr('btype','ten');
   onDragEnd(r);
 
+  // Decena -> 10 unidades
   onDouble(r, ()=>{
-    const start=snap(r.x(), r.y());
-    console.log("Descomponer DECENA en 10 unidades en", start);
+    const start = snap(r.x(), r.y());
     r.destroy();
-    // ►► Crear 10 unidades alineadas horizontalmente
-    for(let k=0;k<10;k++){
+    for (let k=0; k<10; k++){
       createUnit(start.x + k*GRID, start.y);
     }
-    layer.draw(); renderStatus();
+    layer.draw(); updateStatus();
   });
 
   layer.add(r);
@@ -118,53 +165,65 @@ function createTen(x,y){
 }
 
 function createHundred(x,y){
-  const p=snap(x,y);
-  const r=new Konva.Rect({ x:p.x, y:p.y, width:10*GRID, height:10*GRID, fill:COLORS.hundred, draggable:true });
-  r.setAttr("btype","hundred");
+  const p = snap(x,y);
+  const r = new Konva.Rect({
+    x:p.x, y:p.y, width:10*GRID, height:10*GRID,
+    fill:COLORS.hundred, draggable:true, name:'hundred'
+  });
+  r.setAttr('btype','hundred');
   onDragEnd(r);
 
+  // Centena -> 10 decenas
   onDouble(r, ()=>{
-    const start=snap(r.x(), r.y());
-    console.log("Descomponer CENTENA en 10 decenas en", start);
+    const start = snap(r.x(), r.y());
     r.destroy();
-    // ►► Crear 10 decenas apiladas verticalmente
-    for(let row=0; row<10; row++){
+    for (let row=0; row<10; row++){
       createTen(start.x, start.y + row*GRID);
     }
-    layer.draw(); renderStatus();
+    layer.draw(); updateStatus();
   });
 
   layer.add(r);
   return r;
 }
 
-// ----- Botonera (IDs exactos)
+// ----- Botonera (IDs exactos) -----
 function wireUI(){
-  const $=id=>document.getElementById(id);
-  $("btn-unit")    ?.addEventListener("click", ()=>{ const c=center(); createUnit(c.x,c.y); layer.draw(); renderStatus(); });
-  $("btn-ten")     ?.addEventListener("click", ()=>{ const c=center(); createTen(c.x-5*GRID,c.y); layer.draw(); renderStatus(); });
-  $("btn-hundred") ?.addEventListener("click", ()=>{ const c=center(); createHundred(c.x-5*GRID,c.y-5*GRID); layer.draw(); renderStatus(); });
-  $("btn-clear")   ?.addEventListener("click", ()=>{ layer.destroyChildren(); layer.draw(); renderStatus(); });
-  $("btn-compose") ?.addEventListener("click", ()=>{ /* desactivado por ahora para no interferir */ });
+  const $ = id => document.getElementById(id);
 
-  $("btn-say")     ?.addEventListener("click", ()=>{
+  // Añadir piezas
+  $('btn-unit')    ?.addEventListener('click', ()=>{ const c=center(); createUnit(c.x,c.y); layer.draw(); updateStatus(); });
+  $('btn-ten')     ?.addEventListener('click', ()=>{ const c=center(); createTen(c.x-5*GRID,c.y); layer.draw(); updateStatus(); });
+  $('btn-hundred') ?.addEventListener('click', ()=>{ const c=center(); createHundred(c.x-5*GRID,c.y-5*GRID); layer.draw(); updateStatus(); });
+
+  // Limpiar
+  $('btn-clear')   ?.addEventListener('click', ()=>{ layer.destroyChildren(); layer.draw(); updateStatus(); });
+
+  // Construir (desactivado para no interferir mientras probamos descomposición)
+  $('btn-compose') ?.addEventListener('click', ()=>{ /* opcional: agregar auto-compose después */ });
+
+  // Leer
+  $('btn-say')     ?.addEventListener('click', ()=>{
     const {units,tens,hundreds,total}=countAll();
-    const u=new SpeechSynthesisUtterance(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}.`);
-    u.lang="es-ES"; try{ speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{}
+    speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}.`);
   });
 
-  $("btn-challenge")?.addEventListener("click", ()=>{
-    const n=Math.floor(Math.random()*900)+100;
-    $("challenge").textContent=`Forma el número ${n}`;
+  // Reto
+  $('btn-challenge')?.addEventListener('click', ()=>{
+    const n = Math.floor(Math.random()*900)+100;
+    const ch = $('challenge'); if (ch) ch.textContent = `Forma el número ${n}`;
   });
 
-  $("panel-toggle") ?.addEventListener("click", ()=>{
-    const panel=$("panel");
-    const open=panel.classList.toggle("open");
-    const btn=$("panel-toggle");
-    btn.textContent=open?"⬇︎ Ocultar detalles":"⬆︎ Detalles";
+  // Panel
+  $('panel-toggle')?.addEventListener('click', ()=>{
+    const panel = $('panel');
+    const open  = panel.classList.toggle('open');
+    const btn   = $('panel-toggle');
+    btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
   });
 }
+
+// ----- Arranque -----
 wireUI();
-renderStatus();
+updateStatus();
 layer.draw();
