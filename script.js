@@ -1,4 +1,4 @@
-// ===== Bloques — script.js (v12 con contorno suave) =====
+// ===== Bloques — script.js (v13: piezas en Group + contorno suave) =====
 const GRID = 32;
 Konva.pixelRatio = 1;
 
@@ -67,11 +67,24 @@ function speak(text){
   try{ const u=new SpeechSynthesisUtterance(text); u.lang="es-ES"; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{}
 }
 
+// get bounding box de un nodo (Rect o Group) en coords del "world"
+function nodeBox(n){
+  // getClientRect con referencia al 'world' asegura coords en el mismo sistema
+  const r = n.getClientRect({ relativeTo: world });
+  return { x: r.x, y: r.y, w: r.width, h: r.height };
+}
+function isInsideZone(n, zone){
+  const b = nodeBox(n);
+  return b.x >= zone.x && b.y >= zone.y &&
+         (b.x + b.w) <= (zone.x + zone.w) &&
+         (b.y + b.h) <= (zone.y + zone.h);
+}
+
 // ----- Zonas 1×10 (decenas) y 10×10 (centenas) -----
 let ZONES = null;
 function computeZones() {
   const margin = GRID * 2;
-  const tens = { x: margin, y: margin, w: GRID * 10, h: GRID * 1, label: "Zona Decenas (1×10)" };
+  const tens = { x: margin, y: margin, w: GRID * 10, h: GRID * 1,  label: "Zona Decenas (1×10)" };
   const hund = { x: margin, y: tens.y + tens.h + GRID * 2, w: GRID * 10, h: GRID * 10, label: "Zona Centenas (10×10)" };
   ZONES = { tens, hund };
 }
@@ -84,19 +97,12 @@ function drawZones() {
   uiLayer.add(new Konva.Text({ x:hund.x+6, y:hund.y-22, text:hund.label, fontSize:16, fill: ZONE_STROKE, listening:false }));
   uiLayer.draw();
 }
-function nodeBox(n){ return { x: n.x(), y: n.y(), w: n.width(), h: n.height() }; }
-function isInsideZone(n, zone){
-  const b = nodeBox(n);
-  return b.x >= zone.x && b.y >= zone.y &&
-         (b.x + b.w) <= (zone.x + zone.w) &&
-         (b.y + b.h) <= (zone.y + zone.h);
-}
 
 // ----- Contador + descomposición -----
 function countAll(){
   let units=0, tens=0, hundreds=0;
   pieceLayer.getChildren().forEach(n=>{
-    if (n.getClassName() !== 'Rect') return;
+    if (n.getClassName() !== 'Group') return;
     const t = n.name() || n.getAttr('btype');
     if (t==='unit') units++;
     else if (t==='ten') tens++;
@@ -122,73 +128,77 @@ pieceLayer.on('destroy', updateStatus);
 stage.on('dragend', updateStatus);
 
 // ----- Comunes (drag/double) -----
-function onDragEnd(shape){
-  shape.on("dragend", ()=>{
-    shape.position(snap(shape.x(), shape.y()));
+function onDragEnd(group){
+  group.on("dragend", ()=>{
+    // snap al origen del group
+    const p = snap(group.x(), group.y());
+    group.position(p);
     pieceLayer.draw();
     checkBuildZones();
     updateStatus();
   });
 }
-function onDouble(shape, cb){
+function onDouble(group, cb){
   let lastTap=0, lastClick=0;
-  shape.on('dbltap', cb);
-  shape.on('dblclick', cb);
-  shape.on('pointerdown', ()=>{ const now=Date.now(); if(now-lastTap<300) cb(); lastTap=now; });
-  shape.on('click',       ()=>{ const now=Date.now(); if(now-lastClick<300) cb(); lastClick=now; });
+  group.on('dbltap', cb);
+  group.on('dblclick', cb);
+  group.on('pointerdown', ()=>{ const now=Date.now(); if(now-lastTap<300) cb(); lastTap=now; });
+  group.on('click',       ()=>{ const now=Date.now(); if(now-lastClick<300) cb(); lastClick=now; });
 }
 
-// ----- Piezas -----
-function createUnit(x,y){
-  const p=snap(x,y);
-  const r=new Konva.Rect({
-    x:p.x, y:p.y, width:GRID, height:GRID,
-    fill:COLORS.unit, draggable:true, name:'unit',
+// ----- Piezas (cada pieza = Group con Rect hijo) -----
+function addChipRectTo(group, w, h, fill){
+  const rect = new Konva.Rect({
+    x: 0, y: 0,
+    width: w, height: h,
+    fill,
     ...CHIP_STYLE
   });
-  r.setAttr('btype','unit');
-  onDragEnd(r);
-  pieceLayer.add(r); pieceLayer.draw();
+  group.add(rect);
+  return rect;
+}
+
+function createUnit(x,y){
+  const p = snap(x,y);
+  const g = new Konva.Group({ x:p.x, y:p.y, draggable:true, name:'unit' });
+  g.setAttr('btype','unit');
+  addChipRectTo(g, GRID, GRID, COLORS.unit);
+  onDragEnd(g);
+  pieceLayer.add(g); pieceLayer.draw();
   checkBuildZones(); updateStatus();
-  return r;
+  return g;
 }
 function createTen(x,y){
-  const p=snap(x,y);
-  const r=new Konva.Rect({
-    x:p.x, y:p.y, width:10*GRID, height:GRID,
-    fill:COLORS.ten, draggable:true, name:'ten',
-    ...CHIP_STYLE
-  });
-  r.setAttr('btype','ten');
-  onDragEnd(r);
-  onDouble(r, ()=>{
-    const start = snap(r.x(), r.y());
-    r.destroy();
+  const p = snap(x,y);
+  const g = new Konva.Group({ x:p.x, y:p.y, draggable:true, name:'ten' });
+  g.setAttr('btype','ten');
+  addChipRectTo(g, 10*GRID, GRID, COLORS.ten);
+  onDragEnd(g);
+  onDouble(g, ()=>{
+    const start = snap(g.x(), g.y());
+    g.destroy();
     for (let k=0;k<10;k++) createUnit(start.x + k*GRID, start.y);
     pieceLayer.draw(); checkBuildZones(); updateStatus();
   });
-  pieceLayer.add(r); pieceLayer.draw();
+  pieceLayer.add(g); pieceLayer.draw();
   checkBuildZones(); updateStatus();
-  return r;
+  return g;
 }
 function createHundred(x,y){
-  const p=snap(x,y);
-  const r=new Konva.Rect({
-    x:p.x, y:p.y, width:10*GRID, height:10*GRID,
-    fill:COLORS.hundred, draggable:true, name:'hundred',
-    ...CHIP_STYLE
-  });
-  r.setAttr('btype','hundred');
-  onDragEnd(r);
-  onDouble(r, ()=>{
-    const start = snap(r.x(), r.y());
-    r.destroy();
+  const p = snap(x,y);
+  const g = new Konva.Group({ x:p.x, y:p.y, draggable:true, name:'hundred' });
+  g.setAttr('btype','hundred');
+  addChipRectTo(g, 10*GRID, 10*GRID, COLORS.hundred);
+  onDragEnd(g);
+  onDouble(g, ()=>{
+    const start = snap(g.x(), g.y());
+    g.destroy();
     for (let row=0; row<10; row++) createTen(start.x, start.y + row*GRID);
     pieceLayer.draw(); checkBuildZones(); updateStatus();
   });
-  pieceLayer.add(r); pieceLayer.draw();
+  pieceLayer.add(g); pieceLayer.draw();
   checkBuildZones(); updateStatus();
-  return r;
+  return g;
 }
 
 // ----- ZONAS de construcción -----
@@ -196,6 +206,7 @@ function composeTensInZone() {
   const { tens } = ZONES;
   let changed = false;
 
+  // mapear filas y Xs de UNIDADES dentro de la zona
   const rows = new Map();
   pieceLayer.getChildren().forEach(n=>{
     const t = n.name()||n.getAttr('btype');
@@ -206,6 +217,7 @@ function composeTensInZone() {
     rows.get(rowY).set(toCell(n.x()), n);
   });
 
+  // buscar 10 contiguas
   rows.forEach((mapX, rowY)=>{
     const xs = Array.from(mapX.keys()).sort((a,b)=>a-b);
     for (let i=0; i<=xs.length-10; i++){
@@ -222,6 +234,7 @@ function composeTensInZone() {
     }
   });
 
+  // si no hay 10 contiguas, 10 cualesquiera dentro
   if (!changed) {
     const pool=[];
     pieceLayer.getChildren().forEach(n=>{
@@ -318,7 +331,7 @@ function wireUI(){
 let isPanning = false;
 let lastPointerPos = null;
 stage.on('mousedown touchstart', (e)=>{
-  if (e.target && e.target.getParent() === pieceLayer) return;
+  if (e.target && e.target.getParent() === pieceLayer) return; // no pan si arrastras ficha
   isPanning = true;
   lastPointerPos = stage.getPointerPosition();
 });
