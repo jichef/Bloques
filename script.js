@@ -252,23 +252,39 @@ function hablarDescompYLetras(h, t, u, total, pausaMs=1000){
   }
 }
 
-function updateStatus(){
-  const { units, tens, hundreds, total } = countAll();
-  const enLetras = numEnLetras(total);
+let challengeNumber = null;
 
-  const st = document.getElementById("status");
-  if (st) {
-    st.textContent = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades — (${enLetras})`;
-  }
+function startChallenge() {
+  challengeNumber = Math.floor(Math.random() * 100) + 1; // 1 a 100
+  document.getElementById("challenge").textContent =
+    `🎯 Forma el número: ${challengeNumber}`;
+  speak(`Forma el número ${numeroALetras.toWords(challengeNumber)}`);
+}
 
-  const b = document.getElementById("breakdown");
-  if (b){
-    b.innerHTML = `
-      <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
-      <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
-      <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
-      <div class="label">Total</div><div class="value">${total}</div>
-      <div class="label">En letras</div><div class="value">${enLetras}</div>`;
+function updateStatus() {
+  const units = countUnits();
+  const tens = countTens();
+  const hundreds = countHundreds();
+  const total = units + tens * 10 + hundreds * 100;
+
+  document.getElementById("status").textContent =
+    `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
+
+  // Actualizamos breakdown
+  const breakdown = document.getElementById("breakdown");
+  breakdown.innerHTML = `
+    <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
+    <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
+    <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
+    <div class="label">Total</div><div class="value">${total}</div>
+  `;
+
+  // --- Nuevo: comprobar reto ---
+  if (challengeNumber !== null && total === challengeNumber) {
+    const msg = `🎉 ¡Correcto! Has formado ${numeroALetras.toWords(total)}`;
+    document.getElementById("challenge").textContent = msg;
+    speak(msg);
+    challengeNumber = null; // desactivar reto actual
   }
 }
 
