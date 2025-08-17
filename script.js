@@ -1,4 +1,4 @@
-// ===== Bloques — script.js (v13: piezas en Group + contorno suave) =====
+// ===== Bloques — script.js (v14) =====
 const GRID = 32;
 Konva.pixelRatio = 1;
 
@@ -6,7 +6,7 @@ const COLORS = { unit: "#1f78ff", ten: "#ff3b30", hundred: "#2ecc71" };
 const ZONE_STROKE = "#6c5ce7";
 const ZONE_FILL   = "rgba(108,92,231,0.06)";
 
-// Estilo de fichas (contorno + sombra)
+// Estilo de fichas
 const CHIP_STYLE = {
   stroke: "#1a1a1a",
   strokeWidth: 1,
@@ -19,8 +19,8 @@ const CHIP_STYLE = {
 };
 
 // ===== Mundo grande =====
-const WORLD_COLS = 160; // ancho en celdas
-const WORLD_ROWS = 120; // alto en celdas
+const WORLD_COLS = 160;
+const WORLD_ROWS = 120;
 
 // ----- Stage y capas -----
 const stage = new Konva.Stage({
@@ -69,7 +69,6 @@ function speak(text){
 
 // get bounding box de un nodo (Rect o Group) en coords del "world"
 function nodeBox(n){
-  // getClientRect con referencia al 'world' asegura coords en el mismo sistema
   const r = n.getClientRect({ relativeTo: world });
   return { x: r.x, y: r.y, w: r.width, h: r.height };
 }
@@ -80,7 +79,7 @@ function isInsideZone(n, zone){
          (b.y + b.h) <= (zone.y + zone.h);
 }
 
-// ----- Zonas 1×10 (decenas) y 10×10 (centenas) -----
+// ----- Zonas 1×10 y 10×10 -----
 let ZONES = null;
 function computeZones() {
   const margin = GRID * 2;
@@ -130,7 +129,6 @@ stage.on('dragend', updateStatus);
 // ----- Comunes (drag/double) -----
 function onDragEnd(group){
   group.on("dragend", ()=>{
-    // snap al origen del group
     const p = snap(group.x(), group.y());
     group.position(p);
     pieceLayer.draw();
@@ -148,16 +146,10 @@ function onDouble(group, cb){
 
 // ----- Piezas (cada pieza = Group con Rect hijo) -----
 function addChipRectTo(group, w, h, fill){
-  const rect = new Konva.Rect({
-    x: 0, y: 0,
-    width: w, height: h,
-    fill,
-    ...CHIP_STYLE
-  });
+  const rect = new Konva.Rect({ x: 0, y: 0, width: w, height: h, fill, ...CHIP_STYLE });
   group.add(rect);
   return rect;
 }
-
 function createUnit(x,y){
   const p = snap(x,y);
   const g = new Konva.Group({ x:p.x, y:p.y, draggable:true, name:'unit' });
@@ -253,7 +245,6 @@ function composeTensInZone() {
   if (changed) pieceLayer.draw();
   return changed;
 }
-
 function composeHundredsInZone() {
   const { hund } = ZONES;
   let changed = false;
@@ -290,7 +281,6 @@ function composeHundredsInZone() {
   if (changed) pieceLayer.draw();
   return changed;
 }
-
 function checkBuildZones() {
   let changed;
   do {
@@ -331,7 +321,7 @@ function wireUI(){
 let isPanning = false;
 let lastPointerPos = null;
 stage.on('mousedown touchstart', (e)=>{
-  if (e.target && e.target.getParent() === pieceLayer) return; // no pan si arrastras ficha
+  if (e.target && e.target.getParent() === pieceLayer) return;
   isPanning = true;
   lastPointerPos = stage.getPointerPosition();
 });
