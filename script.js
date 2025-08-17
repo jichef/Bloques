@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.8.5: compat find() universal + fixes) =====
-console.log("Bloques v16.8.5");
+// ===== Bloques — script.js (v16.9: no superponer piezas + compat find) =====
+console.log("Bloques v16.9");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -139,25 +139,10 @@ function drawZones() {
 
 // ===== Normalizador universal para collections de Konva / arrays =====
 function collectionToArray(coll){
-  // 1) Si ya es array:
   if (Array.isArray(coll)) return coll;
-  // 2) Si tiene length indexable:
-  if (coll && typeof coll.length === 'number') {
-    const out = [];
-    for (let i = 0; i < coll.length; i++) out.push(coll[i]);
-    return out;
-  }
-  // 3) Konva NodeCollection con .each
-  if (coll && typeof coll.each === 'function') {
-    const out = [];
-    coll.each(n => out.push(n));
-    return out;
-  }
-  // 4) Konva NodeCollection con .toArray
-  if (coll && typeof coll.toArray === 'function') {
-    try { return coll.toArray(); } catch { /* nada */ }
-  }
-  // 5) Último recurso: vacío
+  if (coll && typeof coll.length === 'number') { const out=[]; for (let i=0;i<coll.length;i++) out.push(coll[i]); return out; }
+  if (coll && typeof coll.each === 'function') { const out=[]; coll.each(n=>out.push(n)); return out; }
+  if (coll && typeof coll.toArray === 'function') { try { return coll.toArray(); } catch {} }
   return [];
 }
 
@@ -169,13 +154,79 @@ function getPieceGroups(){
     return t === 'unit' || t === 'ten' || t === 'hundred';
   });
 }
+function pieceType(g){ return (g.name && g.name()) || (g.getAttr && g.getAttr('btype')); }
+function pieceSize(typeOrGroup){
+  const t = typeof typeOrGroup === 'string' ? typeOrGroup : pieceType(typeOrGroup);
+  if (t === 'unit')    return { w: GRID,       h: GRID };
+  if (t === 'ten')     return { w: 10*GRID,    h: GRID };
+  if (t === 'hundred') return { w: 10*GRID,    h: 10*GRID };
+  return { w: GRID, h: GRID };
+}
+function worldBounds(){
+  return { x:0, y:0, w: WORLD_COLS*GRID, h: WORLD_ROWS*GRID };
+}
+function clampToWorld(x,y,w,h){
+  const W = worldBounds();
+  return {
+    x: Math.max(W.x, Math.min(x, W.x + W.w - w)),
+    y: Math.max(W.y, Math.min(y, W.y + W.h - h))
+  };
+}
+
+// ---- Colisiones / Búsqueda de hueco libre ----
+function overlapsRect(rect, ignore=null){
+  for (const other of getPieceGroups()){
+    if (ignore && other === ignore) continue;
+    const b = nodeBoxAbs(other);
+    if (rectsIntersect(rect, b)) return true;
+  }
+  return false;
+}
+function overlapsAny(node){
+  const a = nodeBoxAbs(node);
+  return overlapsRect(a, node);
+}
+function findFreeSpot(desired, type, ignore=null){
+  // desired: {x,y} YA alineado a GRID
+  const { w, h } = pieceSize(type);
+  const W = worldBounds();
+  // 1) Prueba directa
+  const clamped0 = clampToWorld(desired.x, desired.y, w, h);
+  const rect0 = { x: clamped0.x, y: clamped0.y, w, h };
+  if (!overlapsRect(rect0, ignore)) return clamped0;
+
+  // 2) Búsqueda en espiral por celdas
+  const MAX_RADIUS = 60; // celdas
+  for (let r=1; r<=MAX_RADIUS; r++){
+    // Recorre el perímetro del cuadrado de radio r
+    for (let dx=-r; dx<=r; dx++){
+      for (let dy of [-r, r]){ // top y bottom
+        const x = toCell(desired.x + dx*GRID);
+        const y = toCell(desired.y + dy*GRID);
+        const p = clampToWorld(x, y, w, h);
+        const rect = { x:p.x, y:p.y, w, h };
+        if (!overlapsRect(rect, ignore)) return p;
+      }
+    }
+    for (let dy=-r+1; dy<=r-1; dy++){
+      for (let dx of [-r, r]){ // left y right
+        const x = toCell(desired.x + dx*GRID);
+        const y = toCell(desired.y + dy*GRID);
+        const p = clampToWorld(x, y, w, h);
+        const rect = { x:p.x, y:p.y, w, h };
+        if (!overlapsRect(rect, ignore)) return p;
+      }
+    }
+  }
+  return null; // no se encontró (muy raro)
+}
 
 // ----- Contador + descomposición (robusto) -----
 function countAll(){
   const pieces = getPieceGroups();
   let units = 0, tens = 0, hundreds = 0;
   for (const g of pieces){
-    const t = (g.name && g.name()) || (g.getAttr && g.getAttr('btype'));
+    const t = pieceType(g);
     if (t==='unit') units++;
     else if (t==='ten') tens++;
     else if (t==='hundred') hundreds++;
@@ -245,7 +296,7 @@ function reorderTensZone(){
   const z = ZONES.tens;
   const units = [];
   for (const g of getPieceGroups()){
-    const t=(g.name&&g.name())|| (g.getAttr&&g.getAttr('btype'));
+    const t=pieceType(g);
     if (t==='unit' && centerInZone(g, zoneTenRect)) units.push(g);
   }
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
@@ -258,7 +309,7 @@ function reorderHundredsZone(){
   const z = ZONES.hund;
   const tens=[], units=[];
   for (const g of getPieceGroups()){
-    const t=(g.name&&g.name())|| (g.getAttr&&g.getAttr('btype'));
+    const t=pieceType(g);
     if (!centerInZone(g, zoneHundRect)) continue;
     if (t==='ten') tens.push(g); else if (t==='unit') units.push(g);
   }
@@ -273,15 +324,41 @@ function reorderHundredsZone(){
 
 // ----- Eventos comunes -----
 function onDragEnd(group){
+  // Guardar última posición válida al empezar a arrastrar
+  group.on("dragstart", ()=>{
+    group._prevPos = { x: group.x(), y: group.y() };
+  });
+
   group.on("dragend", ()=>{
-    group.position(snap(group.x(), group.y()));
-    const type = (group.name&&group.name()) || (group.getAttr&&group.getAttr('btype'));
+    const type = pieceType(group);
+    // Snap general
+    const snapped = snap(group.x(), group.y());
+    group.position(snapped);
+
+    // Si pisa zonas, reordenamos y componemos como antes
     if (zoneTenRect && type==='unit' && intersectsZone(group, zoneTenRect)) {
-      group.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); checkBuildZones();
+      group.position(snap(ZONES.tens.x, ZONES.tens.y));
+      reorderTensZone();
+      checkBuildZones();
     }
     if (zoneHundRect && (type==='unit' || type==='ten') && intersectsZone(group, zoneHundRect)) {
-      group.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); checkBuildZones();
+      group.position(snap(ZONES.hund.x, ZONES.hund.y));
+      reorderHundredsZone();
+      checkBuildZones();
     }
+
+    // ---- NO SUPERPONER: reubicar si colisiona
+    if (overlapsAny(group)) {
+      const desired = snap(group.x(), group.y());
+      const free = findFreeSpot(desired, type, group);
+      if (free) {
+        group.position(free);
+      } else if (group._prevPos) {
+        // No hay hueco: volver a donde estaba
+        group.position(group._prevPos);
+      }
+    }
+
     pieceLayer.draw();
     updateStatus();
   });
@@ -299,27 +376,67 @@ function addChipRectTo(group, w, h, fill){
   group.add(rect);
   return rect;
 }
+function placeWithoutOverlap(g, desired){
+  const type = pieceType(g);
+  const start = snap(desired.x, desired.y);
+  const free = findFreeSpot(start, type, g);
+  if (free) g.position(free);
+  else g.position(start); // fallback
+}
 function createUnit(x,y){
   const g=new Konva.Group({ x:toCell(x), y:toCell(y), draggable:true, name:'unit' });
-  g.setAttr('btype','unit'); addChipRectTo(g, GRID, GRID, COLORS.unit); onDragEnd(g);
-  pieceLayer.add(g); pieceLayer.draw();
+  g.setAttr('btype','unit');
+  addChipRectTo(g, GRID, GRID, COLORS.unit);
+  onDragEnd(g);
+  pieceLayer.add(g);
+
+  // Recolocar si nace dentro o rozando zonas
   if (zoneTenRect && intersectsZone(g, zoneTenRect)) { g.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); }
-  if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
-  checkBuildZones(); updateStatus(); return g;
+  else if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
+  else { placeWithoutOverlap(g, {x:g.x(), y:g.y()}); }
+
+  pieceLayer.draw();
+  checkBuildZones(); updateStatus();
+  return g;
 }
 function createTen(x,y){
   const g=new Konva.Group({ x:toCell(x), y:toCell(y), draggable:true, name:'ten' });
-  g.setAttr('btype','ten'); addChipRectTo(g, 10*GRID, GRID, COLORS.ten); onDragEnd(g);
-  onDouble(g, ()=>{ const start=snap(g.x(), g.y()); g.destroy(); for(let k=0;k<10;k++) createUnit(start.x + k*GRID, start.y); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
-  pieceLayer.add(g); pieceLayer.draw();
+  g.setAttr('btype','ten');
+  addChipRectTo(g, 10*GRID, GRID, COLORS.ten);
+  onDragEnd(g);
+  onDouble(g, ()=>{
+    const start = snap(g.x(), g.y());
+    g.destroy();
+    for (let k=0;k<10;k++) createUnit(start.x + k*GRID, start.y);
+    pieceLayer.draw(); checkBuildZones(); updateStatus();
+  });
+  pieceLayer.add(g);
+
   if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
-  checkBuildZones(); updateStatus(); return g;
+  else { placeWithoutOverlap(g, {x:g.x(), y:g.y()}); }
+
+  pieceLayer.draw();
+  checkBuildZones(); updateStatus();
+  return g;
 }
 function createHundred(x,y){
   const g=new Konva.Group({ x:toCell(x), y:toCell(y), draggable:true, name:'hundred' });
-  g.setAttr('btype','hundred'); addChipRectTo(g, 10*GRID, 10*GRID, COLORS.hundred); onDragEnd(g);
-  onDouble(g, ()=>{ const start=snap(g.x(), g.y()); g.destroy(); for(let row=0; row<10; row++) createTen(start.x, start.y + row*GRID); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
-  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
+  g.setAttr('btype','hundred');
+  addChipRectTo(g, 10*GRID, 10*GRID, COLORS.hundred);
+  onDragEnd(g);
+  onDouble(g, ()=>{
+    const start = snap(g.x(), g.y());
+    g.destroy();
+    for (let row=0; row<10; row++) createTen(start.x, start.y + row*GRID);
+    pieceLayer.draw(); checkBuildZones(); updateStatus();
+  });
+  pieceLayer.add(g);
+
+  placeWithoutOverlap(g, {x:g.x(), y:g.y()});
+
+  pieceLayer.draw();
+  checkBuildZones(); updateStatus();
+  return g;
 }
 
 // ----- ZONAS de composición -----
@@ -328,7 +445,7 @@ function composeTensInZone() {
   let changed = false;
   const rows = new Map();
   for (const n of getPieceGroups()){
-    const t = (n.name&&n.name())|| (n.getAttr&&n.getAttr('btype'));
+    const t = pieceType(n);
     if (t!=='unit' || !centerInZone(n, zoneTenRect)) continue;
     const rowY = toCell(n.y());
     if (!rows.has(rowY)) rows.set(rowY, new Map());
@@ -341,7 +458,8 @@ function composeTensInZone() {
       if (ok){
         const nodes=[]; for (let k=0;k<10;k++) nodes.push(mapX.get(xs[i]+k*GRID));
         nodes.forEach(n=>n.destroy());
-        createTen(xs[i], rowY);
+        const ten = createTen(xs[i], rowY);
+        placeWithoutOverlap(ten, {x:xs[i], y:rowY});
         changed = true;
       }
     }
@@ -349,13 +467,14 @@ function composeTensInZone() {
   if (!changed) {
     const pool=[];
     for (const n of getPieceGroups()){
-      const t=(n.name&&n.name())|| (n.getAttr&&n.getAttr('btype'));
+      const t=pieceType(n);
       if (t==='unit' && centerInZone(n, zoneTenRect)) pool.push(n);
     }
     if (pool.length>=10){
       const anchor=snap(pool[0].x(), pool[0].y());
       for (let i=0;i<10;i++) pool[i].destroy();
-      createTen(anchor.x, anchor.y);
+      const ten = createTen(anchor.x, anchor.y);
+      placeWithoutOverlap(ten, anchor);
       changed = true;
     }
   }
@@ -368,25 +487,27 @@ function composeHundredsInZone() {
   while (true) {
     const units=[];
     for (const n of getPieceGroups()){
-      const t=(n.name&&n.name())|| (n.getAttr&&n.getAttr('btype'));
+      const t=pieceType(n);
       if (t==='unit' && centerInZone(n, zoneHundRect)) units.push(n);
     }
     if (units.length < 10) break;
     const anchor = snap(units[0].x(), units[0].y());
     for (let i=0;i<10;i++) units[i].destroy();
-    createTen(anchor.x, anchor.y);
+    const ten = createTen(anchor.x, anchor.y);
+    placeWithoutOverlap(ten, anchor);
     changed = true;
   }
   while (true) {
     const tens=[];
     for (const n of getPieceGroups()){
-      const t=(n.name&&n.name())|| (n.getAttr&&n.getAttr('btype'));
+      const t=pieceType(n);
       if (t==='ten' && centerInZone(n, zoneHundRect)) tens.push(n);
     }
     if (tens.length < 10) break;
     const anchor = snap(tens[0].x(), tens[0].y());
     for (let i=0;i<10;i++) tens[i].destroy();
-    createHundred(anchor.x, anchor.y);
+    const hundred = createHundred(anchor.x, anchor.y);
+    placeWithoutOverlap(hundred, anchor);
     changed = true;
   }
   if (changed) { reorderHundredsZone(); pieceLayer.draw(); }
@@ -394,7 +515,8 @@ function composeHundredsInZone() {
 }
 function checkBuildZones() {
   let changed;
-  do { changed = false;
+  do {
+    changed = false;
     if (composeTensInZone())     changed = true;
     if (composeHundredsInZone()) changed = true;
   } while (changed);
