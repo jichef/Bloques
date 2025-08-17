@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.8.3: .toArray everywhere + conteo robusto) =====
-console.log("Bloques v16.8.3");
+// ===== Bloques — script.js (v16.8.4: NodeCollection.each en lugar de toArray) =====
+console.log("Bloques v16.8.4");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -138,12 +138,14 @@ function drawZones() {
 }
 
 // ----- Helpers de piezas (robusto) -----
+// IMPORTANTE: en Konva 9, find() devuelve NodeCollection. Usar .each(), no .toArray()
 function getPieceGroups(){
-  // Solo en pieceLayer y solo Groups de nuestros tres tipos
-  return pieceLayer.find('Group').toArray().filter(g=>{
+  const out = [];
+  pieceLayer.find('Group').each(g=>{
     const t = (g.name && g.name()) || (g.getAttr && g.getAttr('btype'));
-    return t === 'unit' || t === 'ten' || t === 'hundred';
+    if (t === 'unit' || t === 'ten' || t === 'hundred') out.push(g);
   });
+  return out;
 }
 
 // ----- Contador + descomposición (robusto) -----
