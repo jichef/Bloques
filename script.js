@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.7: voz sin ceros + frase natural) =====
-console.log("Bloques v16.7");
+// ===== Bloques — script.js (v16.8: voz en 2 pasos con pausa) =====
+console.log("Bloques v16.8");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -216,23 +216,40 @@ function numEnLetras(n){
   return String(n);
 }
 
-// ---- Frase de voz sin ceros y con “y” natural ----
-function fraseVoz(h, t, u, total){
+// ---- Frase de voz en 2 pasos (descomposición -> pausa -> número en letras) ----
+function hablarDescompYLetras(h, t, u, total, pausaMs=1000){
   const partes = [];
   if (h > 0) partes.push(`${h} ${h === 1 ? 'centena' : 'centenas'}`);
   if (t > 0) partes.push(`${t} ${t === 1 ? 'decena' : 'decenas'}`);
   if (u > 0) partes.push(`${u} ${u === 1 ? 'unidad' : 'unidades'}`);
 
-  // Une con comas y “y” antes del último elemento
+  const letras = numEnLetras(total);
+
+  // Si no hay descomposición (todo 0), solo leer el número en letras
+  if (partes.length === 0) { speak(letras); return; }
+
+  // Construcción natural con “y”
   let descomp = '';
   if (partes.length === 1) descomp = partes[0];
   else if (partes.length === 2) descomp = partes.join(' y ');
-  else if (partes.length >= 3) descomp = partes.slice(0, -1).join(', ') + ' y ' + partes.slice(-1);
+  else descomp = partes.slice(0, -1).join(', ') + ' y ' + partes.slice(-1);
 
-  const letras = numEnLetras(total);
-  if (descomp) return `Tienes ${descomp} — ${letras}`;
-  // Si todo es 0, solo dicen el total en letras (aunque normalmente ni se llama)
-  return letras;
+  try{
+    speechSynthesis.cancel();
+    const u1 = new SpeechSynthesisUtterance(`Tienes ${descomp}`);
+    u1.lang = 'es-ES';
+    u1.onend = () => {
+      setTimeout(() => {
+        const u2 = new SpeechSynthesisUtterance(letras);
+        u2.lang = 'es-ES';
+        speechSynthesis.speak(u2);
+      }, pausaMs);
+    };
+    speechSynthesis.speak(u1);
+  }catch{
+    // Fallback
+    speak(`Tienes ${descomp}`); setTimeout(()=>speak(letras), pausaMs);
+  }
 }
 
 function updateStatus(){
@@ -287,43 +304,32 @@ function reorderHundredsZone(){
   tens.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
 
-  // Decenas ocupan filas completas
-  tens.forEach((g,i)=>{
-    g.position(snap(z.x, z.y + i*GRID));
-  });
-  // Unidades rellenan a partir de la primera fila libre
+  tens.forEach((g,i)=>{ g.position(snap(z.x, z.y + i*GRID)); });
   const startRow = tens.length;
   units.forEach((g,i)=>{
     const row = startRow + Math.floor(i/10);
     const col = i % 10;
     g.position(snap(z.x + col*GRID, z.y + row*GRID));
   });
-
   pieceLayer.batchDraw();
 }
 
 // ----- Eventos comunes -----
 function onDragEnd(group){
   group.on("dragend", ()=>{
-    // Snap general
     group.position(snap(group.x(), group.y()));
-
     const type = group.name() || group.getAttr('btype');
 
-    // Si ROZA la zona de decenas con una unidad → la forzamos a entrar y reordenamos
     if (zoneTenRect && type==='unit' && intersectsZone(group, zoneTenRect)) {
       group.position(snap(ZONES.tens.x, ZONES.tens.y));
       reorderTensZone();
-      checkBuildZones(); // puede convertir 10U → 1D
+      checkBuildZones();
     }
-
-    // Si ROZA la zona de centenas con una unidad o decena → meter y reordenar
     if (zoneHundRect && (type==='unit' || type==='ten') && intersectsZone(group, zoneHundRect)) {
       group.position(snap(ZONES.hund.x, ZONES.hund.y));
       reorderHundredsZone();
-      checkBuildZones(); // puede convertir 10D → 1C o 10U → 1D
+      checkBuildZones();
     }
-
     pieceLayer.draw();
     updateStatus();
   });
@@ -349,7 +355,6 @@ function createUnit(x,y){
   onDragEnd(g);
   pieceLayer.add(g); pieceLayer.draw();
 
-  // Si nace dentro o rozando zonas → ordenar/convertir
   if (zoneTenRect && intersectsZone(g, zoneTenRect)) { g.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); }
   if (zoneHundRect && intersectsZone(g, zoneHundRect)) { g.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); }
 
@@ -395,7 +400,6 @@ function composeTensInZone() {
   if (!zoneTenRect) return false;
   let changed = false;
 
-  // Tomamos UNIDADES cuyo CENTRO está en la zona
   const rows = new Map();
   pieceLayer.getChildren().forEach(n=>{
     const t = n.name()||n.getAttr('btype');
@@ -406,7 +410,6 @@ function composeTensInZone() {
     rows.get(rowY).set(toCell(n.x()), n);
   });
 
-  // Preferir 10 contiguas
   rows.forEach((mapX, rowY)=>{
     const xs = Array.from(mapX.keys()).sort((a,b)=>a-b);
     for (let i=0; i<=xs.length-10; i++){
@@ -423,7 +426,6 @@ function composeTensInZone() {
     }
   });
 
-  // Si no hay 10 contiguas, 10 cualesquiera
   if (!changed) {
     const pool=[];
     pieceLayer.getChildren().forEach(n=>{
@@ -447,7 +449,6 @@ function composeHundredsInZone() {
   if (!zoneHundRect) return false;
   let changed = false;
 
-  // Unidades -> Decenas
   while (true) {
     const units=[];
     pieceLayer.getChildren().forEach(n=>{
@@ -461,7 +462,7 @@ function composeHundredsInZone() {
     createTen(anchor.x, anchor.y);
     changed = true;
   }
-  // Decenas -> Centena
+
   while (true) {
     const tens=[];
     pieceLayer.getChildren().forEach(n=>{
@@ -487,7 +488,6 @@ function checkBuildZones() {
     if (composeTensInZone())     changed = true;
     if (composeHundredsInZone()) changed = true;
   } while (changed);
-  // Reordenado final por si quedaron restos
   reorderTensZone();
   reorderHundredsZone();
   updateStatus();
@@ -503,12 +503,11 @@ function wireUI(){
   $('btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); });
   $('btn-compose')?.addEventListener('click', ()=>{ checkBuildZones(); });
 
-  // 🔊 Leer número (omitir ceros y sin duplicar)
+  // 🔊 Leer número (descomposición -> pausa -> número en letras)
   $('btn-say')?.addEventListener('click', ()=>{
     const {units,tens,hundreds,total}=countAll();
     if (total === 0) return;
-    const frase = fraseVoz(hundreds, tens, units, total);
-    speak(frase);
+    hablarDescompYLetras(hundreds, tens, units, total, 1100); // ~1.1s de pausa
   });
 
   $('btn-challenge')?.addEventListener('click', ()=>{
