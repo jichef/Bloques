@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.9.1: spawn sin solape real + zonas centradas + intro) =====
-console.log("Bloques v16.9.1");
+// ===== Bloques — script.js (v16.9.3: SPAWN sin solapes + zonas centradas en mundo + intro) =====
+console.log("Bloques v16.9.3");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -8,7 +8,6 @@ const COLORS = { unit: "#1f78ff", ten: "#ff3b30", hundred: "#2ecc71" };
 const ZONE_STROKE = "#6c5ce7";
 const ZONE_FILL   = "rgba(108,92,231,0.06)";
 
-// Estilo de fichas (contorno + sombra)
 const CHIP_STYLE = {
   stroke: "#1a1a1a",
   strokeWidth: 1,
@@ -23,6 +22,8 @@ const CHIP_STYLE = {
 // ===== Mundo grande =====
 const WORLD_COLS = 160;
 const WORLD_ROWS = 120;
+const WORLD_W = WORLD_COLS * GRID;
+const WORLD_H = WORLD_ROWS * GRID;
 
 // ===== Zoom limits =====
 const SCALE_MIN = 0.4, SCALE_MAX = 3.0, SCALE_BY = 1.06;
@@ -36,11 +37,9 @@ const stage = new Konva.Stage({
 const gridLayer  = new Konva.Layer({ listening: false, opacity: 0 });
 const uiLayer    = new Konva.Layer({ listening: false, opacity: 0 });
 const pieceLayer = new Konva.Layer({ opacity: 0 });
-stage.add(gridLayer);
-stage.add(uiLayer);
-stage.add(pieceLayer);
+stage.add(gridLayer, uiLayer, pieceLayer);
 
-// Transformación global (pan/zoom)
+// Transformación global
 const world = { x: 0, y: 0, scale: 1 };
 function applyWorldTransform() {
   [gridLayer, uiLayer, pieceLayer].forEach(L => {
@@ -50,16 +49,13 @@ function applyWorldTransform() {
   stage.batchDraw();
 }
 
-// === Conversión pantalla ⇄ mundo
+// === Utilidades espacio mundo/viewport
+const worldCenter = ()=>({ x: WORLD_W/2, y: WORLD_H/2 });
 function screenToWorld(pt){ return { x:(pt.x-world.x)/world.scale, y:(pt.y-world.y)/world.scale }; }
 function visibleWorldRect(){
   const tl = screenToWorld({ x: 0, y: 0 });
   const br = screenToWorld({ x: stage.width(), y: stage.height() });
   return { x: tl.x, y: tl.y, w: br.x - tl.x, h: br.y - tl.y };
-}
-function visibleWorldCenter(){
-  const r = visibleWorldRect();
-  return { x: toCell(r.x + r.w/2), y: toCell(r.y + r.h/2) };
 }
 function clampToVisible(x, y, w, h){
   const r = visibleWorldRect();
@@ -79,17 +75,15 @@ function zoomAt(pointer, targetScale){
 function zoomStep(direction){
   const factor = direction > 0 ? SCALE_BY : 1 / SCALE_BY;
   const target = world.scale * factor;
-  const center = { x: stage.width() / 2, y: stage.height() / 2 };
-  zoomAt(center, target);
+  zoomAt({ x: stage.width()/2, y: stage.height()/2 }, target);
 }
 
 // ----- Cuadrícula -----
 function drawGrid() {
   gridLayer.destroyChildren();
-  const W = WORLD_COLS * GRID, H = WORLD_ROWS * GRID;
-  gridLayer.add(new Konva.Rect({ x: 0, y: 0, width: W, height: H, stroke: "#dddddd", strokeWidth: 2, listening: false }));
-  for (let x = 0; x <= W; x += GRID) gridLayer.add(new Konva.Line({ points:[x+0.5,0,x+0.5,H], stroke:"#e5e5e5", strokeWidth:1, listening:false }));
-  for (let y = 0; y <= H; y += GRID) gridLayer.add(new Konva.Line({ points:[0,y+0.5,W,y+0.5], stroke:"#e5e5e5", strokeWidth:1, listening:false }));
+  gridLayer.add(new Konva.Rect({ x: 0, y: 0, width: WORLD_W, height: WORLD_H, stroke: "#dddddd", strokeWidth: 2, listening: false }));
+  for (let x = 0; x <= WORLD_W; x += GRID) gridLayer.add(new Konva.Line({ points:[x+0.5,0,x+0.5,WORLD_H], stroke:"#e5e5e5", strokeWidth:1, listening:false }));
+  for (let y = 0; y <= WORLD_H; y += GRID) gridLayer.add(new Konva.Line({ points:[0,y+0.5,WORLD_W,y+0.5], stroke:"#e5e5e5", strokeWidth:1, listening:false }));
   gridLayer.draw();
 }
 
@@ -99,35 +93,31 @@ const snap   = (x,y)=>({x:toCell(x), y:toCell(y)});
 function speak(text){
   try{ const u=new SpeechSynthesisUtterance(text); u.lang="es-ES"; speechSynthesis.cancel(); speechSynthesis.speak(u); }catch{}
 }
-
-// ==== Geometría de zona ====
-// OJO: ahora NO usamos getClientRect() para colisiones; calculamos cajas exactas por tipo.
 function rectsIntersect(a,b){ return !(a.x+a.w<=b.x || a.x>=b.x+b.w || a.y+a.h<=b.y || a.y>=b.y+b.h); }
 
-// ----- Zonas 1×10 y 10×10 (centradas) -----
+// ----- Zonas 1×10 y 10×10 (centradas en el mundo) -----
 let ZONES = null;
 let zoneTenRect = null;
 let zoneHundRect = null;
 
-function computeZonesCentered() {
-  const vc = visibleWorldCenter();
+function computeZonesCenteredWorld() {
+  const wc = worldCenter();
   const tensSize = { w: 10*GRID, h: 1*GRID };
   const hundSize = { w: 10*GRID, h:10*GRID };
   const gap = 2*GRID;
 
   const tens = {
-    x: toCell(vc.x - tensSize.w/2),
-    y: toCell(vc.y - (hundSize.h + gap + tensSize.h)/2),
+    x: toCell(wc.x - tensSize.w/2),
+    y: toCell(wc.y - (hundSize.h + gap + tensSize.h)/2),
     w: tensSize.w, h: tensSize.h, label: "Zona Decenas (1×10)"
   };
   const hund = {
-    x: toCell(vc.x - hundSize.w/2),
+    x: toCell(wc.x - hundSize.w/2),
     y: toCell(tens.y + tens.h + gap),
     w: hundSize.w, h: hundSize.h, label: "Zona Centenas (10×10)"
   };
   ZONES = { tens, hund };
 }
-
 function drawZones() {
   uiLayer.destroyChildren();
   const { tens, hund } = ZONES;
@@ -139,13 +129,9 @@ function drawZones() {
   uiLayer.draw();
 }
 
-// ----- Helpers de piezas (arrays reales) -----
-function childrenGroups(){
-  return pieceLayer.getChildren(n => n.getClassName && n.getClassName() === 'Group');
-}
-function pieceType(g){
-  return (g.name && g.name()) || (g.getAttr && g.getAttr('btype')) || '';
-}
+// ----- Helpers de piezas -----
+const childrenGroups = ()=> pieceLayer.getChildren(n => n.getClassName && n.getClassName() === 'Group');
+const pieceType = (g)=> (g.name && g.name()) || (g.getAttr && g.getAttr('btype')) || '';
 function typeSize(t){
   if (t==='unit') return { w: GRID, h: GRID };
   if (t==='ten')  return { w: 10*GRID, h: GRID };
@@ -162,35 +148,58 @@ function overlapsAnyBox(box, skipId=null){
   for (let i=0; i<groups.length; i++){
     const g = groups[i];
     if (skipId && g._id === skipId) continue;
-    const b = boxForGroup(g);
-    if (rectsIntersect(box, b)) return true;
+    if (rectsIntersect(box, boxForGroup(g))) return true;
   }
   return false;
 }
 
-// Busca hueco libre (espiral discreta en cuadrícula) usando cajas exactas
-function findFreeSpot(x0, y0, w, h, maxTurns=80){
-  let x = toCell(x0), y = toCell(y0);
-  let box = { x, y, w, h };
-  if (!overlapsAnyBox(box)) return box;
+// ===== SPAWN: cursor de aparición sin solapes =====
+const SPAWN = {
+  baseX: 0, baseY: 0,
+  curX: 0, curY: 0,
+  rowH: GRID*2, // altura de fila por defecto; se ajusta con la pieza más alta
+  maxWidth: GRID * 36, // ancho de banda de spawn (~36 celdas)
+};
 
-  let step = GRID, len = 1, dir = 0, moved = 0, turns = 0;
-  while (turns < maxTurns){
-    const dx = dir === 0 ? step : dir === 2 ? -step : 0;
-    const dy = dir === 1 ? step : dir === 3 ? -step : 0;
-    x = toCell(x + dx); y = toCell(y + dy);
-    box = { x, y, w, h };
-    if (!overlapsAnyBox(box)) return box;
-    moved++;
-    if (moved === len){
-      moved = 0; dir = (dir + 1) % 4; turns++;
-      if (dir === 0 || dir === 2) len++;
-    }
+// Recalcula la base de spawn a la derecha de la zona 10×10
+function resetSpawnBase(){
+  const offset = 3*GRID;
+  SPAWN.baseX = ZONES.hund.x + ZONES.hund.w + offset;
+  SPAWN.baseY = ZONES.hund.y + offset;
+  SPAWN.curX  = SPAWN.baseX;
+  SPAWN.curY  = SPAWN.baseY;
+  SPAWN.rowH  = GRID*2;
+}
+// Avanza el cursor a la siguiente columna/fila
+function advanceSpawn(w, h){
+  const stepX = Math.max(GRID, w + GRID); // dejar un GRID de separación
+  SPAWN.curX += stepX;
+  SPAWN.rowH = Math.max(SPAWN.rowH, h + GRID);
+  if (SPAWN.curX - SPAWN.baseX > SPAWN.maxWidth){
+    SPAWN.curX = SPAWN.baseX;
+    SPAWN.curY += SPAWN.rowH;
+    SPAWN.rowH = GRID*2;
   }
-  return { x: x0, y: y0, w, h }; // fallback
+}
+// Encuentra hueco alrededor del cursor actual (unos cuantos intentos)
+function findSpawnRect(w, h){
+  // intenta en el cursor actual y varias avanzadas si colisiona
+  const attempts = 200; // suficiente para no solapar
+  let tried = 0;
+  while (tried < attempts){
+    const pos = snap(SPAWN.curX, SPAWN.curY);
+    const box = { x: pos.x, y: pos.y, w, h };
+    if (!overlapsAnyBox(box)) return box;
+    advanceSpawn(w, h);
+    tried++;
+  }
+  // fallback: colocar en cualquier sitio cercano al borde derecho visible
+  const v = visibleWorldRect();
+  const fallback = { x: toCell(v.x + v.w - w - GRID), y: toCell(v.y + GRID), w, h };
+  return fallback;
 }
 
-// ----- Contador + descomposición (robusto) -----
+// ----- Contador + descomposición -----
 function getPieceGroups(){
   const out = [];
   const groups = childrenGroups();
@@ -213,7 +222,7 @@ function countAll(){
   return { units, tens, hundreds, total: units + 10*tens + 100*hundreds };
 }
 
-// === Conversor ES nativo (0..999999) ===
+// === Conversor ES (0..999999) ===
 function numEnLetras(n){
   n = Math.floor(Number(n) || 0);
   if (n === 0) return 'cero';
@@ -286,9 +295,7 @@ function reorderTensZone(){
     if (pieceType(g)==='unit' && centerInZone(g, zoneTenRect)) units.push(g);
   }
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
-  for (let i=0; i<units.length; i++){
-    units[i].position(snap(z.x + Math.min(i,9)*GRID, z.y));
-  }
+  for (let i=0; i<units.length; i++) units[i].position(snap(z.x + Math.min(i,9)*GRID, z.y));
   pieceLayer.batchDraw();
   updateStatus();
 }
@@ -320,12 +327,10 @@ function onDragEnd(group){
   group.on("dragend", ()=>{
     group.position(snap(group.x(), group.y()));
     const type = pieceType(group);
-    if (zoneTenRect && type==='unit' && rectsIntersect(boxForGroup(group), {x:ZONES.tens.x,y:ZONES.tens.y,w:ZONES.tens.w,h:ZONES.tens.h})) {
-      group.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); checkBuildZones();
-    }
-    if (zoneHundRect && (type==='unit' || type==='ten') && rectsIntersect(boxForGroup(group), {x:ZONES.hund.x,y:ZONES.hund.y,w:ZONES.hund.w,h:ZONES.hund.h})) {
-      group.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); checkBuildZones();
-    }
+    const inTens = rectsIntersect(boxForGroup(group), {x:ZONES.tens.x,y:ZONES.tens.y,w:ZONES.tens.w,h:ZONES.tens.h});
+    const inHund = rectsIntersect(boxForGroup(group), {x:ZONES.hund.x,y:ZONES.hund.y,w:ZONES.hund.w,h:ZONES.hund.h});
+    if (zoneTenRect && type==='unit' && inTens) { group.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); checkBuildZones(); }
+    if (zoneHundRect && (type==='unit' || type==='ten') && inHund) { group.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); checkBuildZones(); }
     pieceLayer.draw();
     updateStatus();
   });
@@ -337,57 +342,60 @@ function onDouble(group, cb){
   group.on('click',       ()=>{ const now=Date.now(); if(now-lastClick<300) cb(); lastClick=now; });
 }
 
-// ----- Piezas -----
-// Punto de *spawn* principal: a la derecha de la zona de centenas
-function spawnAnchorFor(w, h){
-  const { hund } = ZONES;
-  const offset = 3*GRID;
-  const x0 = hund.x + hund.w + offset;
-  const y0 = hund.y + offset;
-  const clamped = clampToVisible(x0, y0, w, h);
-  const free = findFreeSpot(clamped.x, clamped.y, w, h, 120);
-  return { x: free.x, y: free.y };
-}
-
+// ----- Creación de piezas (usa SPAWN sin solape) -----
 function addChipRectTo(group, w, h, fill){
   const rect = new Konva.Rect({ x:0, y:0, width:w, height:h, fill, ...CHIP_STYLE });
   group.add(rect);
   return rect;
 }
-
 function createUnit(x,y){
   const w=GRID, h=GRID;
-  const p = (x==null||y==null) ? spawnAnchorFor(w,h) : snap(x,y);
-  // asegurar hueco justo antes de crear
-  const free = findFreeSpot(p.x, p.y, w, h, 120);
-  const g=new Konva.Group({ x:free.x, y:free.y, draggable:true, name:'unit' });
+  let pos;
+  if (x==null||y==null){
+    const box = findSpawnRect(w,h);
+    pos = { x: box.x, y: box.y };
+    advanceSpawn(w,h);
+  } else {
+    pos = snap(x,y);
+  }
+  const g=new Konva.Group({ x:pos.x, y:pos.y, draggable:true, name:'unit' });
   g.setAttr('btype','unit'); addChipRectTo(g, w, h, COLORS.unit); onDragEnd(g);
   pieceLayer.add(g); pieceLayer.draw();
   checkBuildZones(); updateStatus(); return g;
 }
-
 function createTen(x,y){
   const w=10*GRID, h=GRID;
-  const p = (x==null||y==null) ? spawnAnchorFor(w,h) : snap(x,y);
-  const free = findFreeSpot(p.x, p.y, w, h, 120);
-  const g=new Konva.Group({ x:free.x, y:free.y, draggable:true, name:'ten' });
+  let pos;
+  if (x==null||y==null){
+    const box = findSpawnRect(w,h);
+    pos = { x: box.x, y: box.y };
+    advanceSpawn(w,h);
+  } else {
+    pos = snap(x,y);
+  }
+  const g=new Konva.Group({ x:pos.x, y:pos.y, draggable:true, name:'ten' });
   g.setAttr('btype','ten'); addChipRectTo(g, w, h, COLORS.ten); onDragEnd(g);
   onDouble(g, ()=>{ const start=snap(g.x(), g.y()); g.destroy(); for(let k=0;k<10;k++) createUnit(start.x + k*GRID, start.y); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
   pieceLayer.add(g); pieceLayer.draw();
   checkBuildZones(); updateStatus(); return g;
 }
-
 function createHundred(x,y){
   const w=10*GRID, h=10*GRID;
-  const p = (x==null||y==null) ? spawnAnchorFor(w,h) : snap(x,y);
-  const free = findFreeSpot(p.x, p.y, w, h, 120);
-  const g=new Konva.Group({ x:free.x, y:free.y, draggable:true, name:'hundred' });
+  let pos;
+  if (x==null||y==null){
+    const box = findSpawnRect(w,h);
+    pos = { x: box.x, y: box.y };
+    advanceSpawn(w,h);
+  } else {
+    pos = snap(x,y);
+  }
+  const g=new Konva.Group({ x:pos.x, y:pos.y, draggable:true, name:'hundred' });
   g.setAttr('btype','hundred'); addChipRectTo(g, w, h, COLORS.hundred); onDragEnd(g);
   onDouble(g, ()=>{ const start=snap(g.x(), g.y()); g.destroy(); for(let row=0; row<10; row++) createTen(start.x, start.y + row*GRID); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
   pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
 
-// ----- ZONAS de composición -----
+// ----- Composición en zonas -----
 function composeTensInZone() {
   if (!zoneTenRect) return false;
   let changed = false;
@@ -494,17 +502,15 @@ function wireUI(){
   $('btn-unit')   ?.addEventListener('click', ()=>{ createUnit(); });
   $('btn-ten')    ?.addEventListener('click', ()=>{ createTen(); });
   $('btn-hundred')?.addEventListener('click', ()=>{ createHundred(); });
-  $('btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); });
+  $('btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase(); });
   $('btn-compose')?.addEventListener('click', ()=>{ checkBuildZones(); });
 
-  // 🔊 Leer número
   $('btn-say')?.addEventListener('click', ()=>{
     const {units,tens,hundreds,total}=countAll();
     if (total === 0) return;
     hablarDescompYLetras(hundreds, tens, units, total, 1100);
   });
 
-  // 🎯 Reto
   $('btn-challenge')?.addEventListener('click', ()=>{
     challengeNumber = Math.floor(Math.random()*900)+1;
     const ch=document.getElementById('challenge');
@@ -521,11 +527,18 @@ function wireUI(){
     panel.setAttribute('aria-hidden', String(!open));
   });
 
-  // 🔍 Zoom
   const bindZoom=(id,fn)=>{ const el=$(id); if(!el) return; el.addEventListener('click',e=>{e.preventDefault();fn();}); el.addEventListener('pointerdown',e=>{e.preventDefault();fn();}); };
   bindZoom('btn-zoom-in',  ()=> zoomStep(+1));
   bindZoom('btn-zoom-out', ()=> zoomStep(-1));
-  bindZoom('btn-reset-view', ()=>{ world.x=0; world.y=0; world.scale=1; applyWorldTransform(); computeZonesCentered(); drawZones(); });
+  bindZoom('btn-reset-view', ()=>{
+    world.scale=1;
+    const wc = worldCenter();
+    world.x = stage.width()/2  - wc.x;
+    world.y = stage.height()/2 - wc.y;
+    applyWorldTransform();
+    computeZonesCenteredWorld(); drawZones();
+    resetSpawnBase();
+  });
 }
 
 // ----- Pan & Zoom -----
@@ -536,21 +549,22 @@ stage.on('mouseup touchend', ()=>{ isPanning=false; lastPointerPos=null; });
 stage.on('wheel', (e)=>{ e.evt.preventDefault(); const old=world.scale; const p=stage.getPointerPosition(); const m={x:(p.x-world.x)/old,y:(p.y-world.y)/old}; let s=e.evt.deltaY>0?old/SCALE_BY:old*SCALE_BY; s=Math.max(SCALE_MIN,Math.min(SCALE_MAX,s)); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform(); });
 stage.on('dblclick dbltap', ()=>{ const p=stage.getPointerPosition(); const old=world.scale; const m={x:(p.x-world.x)/old,y:(p.y-world.y)/old}; let s=Math.min(SCALE_MAX, old*1.25); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform(); });
 
-// ----- Intro anim (fade + zoom de grande a pequeño) -----
+// ----- Intro (fade + zoom centrado al mundo) -----
 function startIntroAnimation(){
   const targetScale = 1.0;
   const startScale  = 1.6;
 
-  computeZonesCentered();
-  const centerScreen = { x: stage.width()/2, y: stage.height()/2 };
+  // centra el centro del MUNDO en el centro de pantalla
+  const wc = worldCenter();
   world.scale = startScale;
-  const vc = visibleWorldCenter();
-  world.x = centerScreen.x - vc.x * world.scale;
-  world.y = centerScreen.y - vc.y * world.scale;
+  world.x = stage.width()/2  - wc.x * world.scale;
+  world.y = stage.height()/2 - wc.y * world.scale;
   applyWorldTransform();
 
   drawGrid();
+  computeZonesCenteredWorld();
   drawZones();
+  resetSpawnBase();
 
   [gridLayer, uiLayer, pieceLayer].forEach(L=>{
     L.opacity(0);
@@ -563,8 +577,7 @@ function startIntroAnimation(){
     i++;
     const t = i/steps;
     const s = startScale + (targetScale - startScale)*t;
-    const pointer = { x: stage.width()/2, y: stage.height()/2 };
-    zoomAt(pointer, s);
+    zoomAt({ x: stage.width()/2, y: stage.height()/2 }, s);
     if (i >= steps) clearInterval(timer);
   }, dt*1000);
 }
@@ -574,9 +587,10 @@ function relayout(){
   stage.width(window.innerWidth);
   stage.height(window.innerHeight);
   drawGrid();
-  computeZonesCentered();
+  computeZonesCenteredWorld();
   drawZones();
   applyWorldTransform();
+  resetSpawnBase();
   pieceLayer.draw();
   updateStatus();
 }
@@ -584,9 +598,10 @@ window.addEventListener("resize", relayout);
 
 // Boot
 drawGrid();
-computeZonesCentered();
+computeZonesCenteredWorld();
 drawZones();
 applyWorldTransform();
+resetSpawnBase();
 wireUI();
 updateStatus();
 pieceLayer.draw();
