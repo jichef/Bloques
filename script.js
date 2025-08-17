@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.3: zoom buttons funcionando) =====
-console.log("Bloques v16.3");
+// ===== Bloques — script.js (v16.4: zoom + spawn visible + auto-orden en zonas) =====
+console.log("Bloques v16.4");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -24,7 +24,7 @@ const CHIP_STYLE = {
 const WORLD_COLS = 160;
 const WORLD_ROWS = 120;
 
-// ===== Zoom limits (arriba para evitar TDZ) =====
+// ===== Zoom limits =====
 const SCALE_MIN = 0.4, SCALE_MAX = 3.0, SCALE_BY = 1.06;
 
 // ----- Stage y Layers -----
@@ -50,6 +50,7 @@ function applyWorldTransform() {
   });
   stage.batchDraw();
 }
+
 // === Conversión pantalla ⇄ mundo (con tu pan/zoom)
 function screenToWorld(pt){
   return {
@@ -86,14 +87,13 @@ function spawnPosUnit(){
 }
 function spawnPosTen(){
   const c = visibleWorldCenter();
-  // la decena mide 10×1 celdas
   return clampToVisible(c.x - 5*GRID, c.y, 10*GRID, GRID);
 }
 function spawnPosHundred(){
   const c = visibleWorldCenter();
-  // la centena mide 10×10 celdas
   return clampToVisible(c.x - 5*GRID, c.y - 5*GRID, 10*GRID, 10*GRID);
 }
+
 // Helpers de zoom
 function zoomAt(pointer, targetScale){
   const old = world.scale;
@@ -204,13 +204,81 @@ function updateStatus(){
   }
 }
 
+// ======= AUTO-ORDENACIÓN EN ZONAS =======
+function reorderTensZone(){
+  if (!zoneTenRect) return;
+  const z = ZONES.tens;
+  // Solo UNIDADES dentro de zona de decenas
+  const units = [];
+  pieceLayer.getChildren().forEach(g=>{
+    if (g.getClassName() !== 'Group') return;
+    const t = g.name() || g.getAttr('btype');
+    if (t !== 'unit') return;
+    if (isInsideZone(g, zoneTenRect)) units.push(g);
+  });
+  // Orden estable por x,y para consistencia
+  units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
+  // Colocar en 1×10 (izq→der). Si hay >10, se quedan alineadas en la misma fila (las extra se pondrán encima: puedes ampliar a 2 filas si quieres)
+  units.forEach((g,i)=>{
+    const X = z.x + Math.min(i,9)*GRID;
+    const Y = z.y;
+    g.position(snap(X,Y));
+  });
+  pieceLayer.batchDraw();
+}
+
+function reorderHundredsZone(){
+  if (!zoneHundRect) return;
+  const z = ZONES.hund;
+  const tens=[], units=[];
+  pieceLayer.getChildren().forEach(g=>{
+    if (g.getClassName() !== 'Group') return;
+    const t = g.name() || g.getAttr('btype');
+    if (!isInsideZone(g, zoneHundRect)) return;
+    if (t==='ten') tens.push(g);
+    else if (t==='unit') units.push(g);
+  });
+  // Orden estable
+  tens.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
+  units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
+
+  // 1) Decenas ocupan filas completas desde arriba
+  tens.forEach((g,i)=>{
+    const X = z.x;
+    const Y = z.y + i*GRID;
+    g.position(snap(X,Y));
+  });
+
+  // 2) Unidades rellenan a partir de la primera fila libre
+  const startRow = tens.length;
+  units.forEach((g,i)=>{
+    const row = startRow + Math.floor(i/10);
+    const col = i % 10;
+    const X = z.x + col*GRID;
+    const Y = z.y + row*GRID;
+    g.position(snap(X,Y));
+  });
+
+  pieceLayer.batchDraw();
+}
+
 // ----- Eventos comunes -----
 function onDragEnd(group){
   group.on("dragend", ()=>{
+    // Snap general
     const p = snap(group.x(), group.y());
     group.position(p);
+
+    // Si cae en zonas especiales, reordenar
+    if (zoneTenRect && isInsideZone(group, zoneTenRect)) {
+      reorderTensZone();
+    }
+    if (zoneHundRect && isInsideZone(group, zoneHundRect)) {
+      reorderHundredsZone();
+    }
+
     pieceLayer.draw();
-    checkBuildZones();
+    checkBuildZones(); // podría fusionar → reordenamos después dentro de checkBuildZones
     updateStatus();
   });
 }
@@ -235,6 +303,11 @@ function createUnit(x,y){
   addChipRectTo(g, GRID, GRID, COLORS.unit);
   onDragEnd(g);
   pieceLayer.add(g); pieceLayer.draw();
+
+  // Si nace dentro de zonas → reordenar
+  if (zoneTenRect && isInsideZone(g, zoneTenRect)) reorderTensZone();
+  if (zoneHundRect && isInsideZone(g, zoneHundRect)) reorderHundredsZone();
+
   checkBuildZones(); updateStatus();
   return g;
 }
@@ -251,6 +324,9 @@ function createTen(x,y){
     pieceLayer.draw(); checkBuildZones(); updateStatus();
   });
   pieceLayer.add(g); pieceLayer.draw();
+
+  if (zoneHundRect && isInsideZone(g, zoneHundRect)) reorderHundredsZone();
+
   checkBuildZones(); updateStatus();
   return g;
 }
@@ -271,7 +347,7 @@ function createHundred(x,y){
   return g;
 }
 
-// ----- ZONAS de construcción -----
+// ----- ZONAS de construcción (composición) -----
 function composeTensInZone() {
   if (!zoneTenRect) return false;
   let changed = false;
@@ -320,9 +396,13 @@ function composeTensInZone() {
     }
   }
 
-  if (changed) pieceLayer.draw();
+  if (changed) {
+    reorderTensZone();
+    pieceLayer.draw();
+  }
   return changed;
 }
+
 function composeHundredsInZone() {
   if (!zoneHundRect) return false;
   let changed = false;
@@ -356,9 +436,13 @@ function composeHundredsInZone() {
     changed = true;
   }
 
-  if (changed) pieceLayer.draw();
+  if (changed) {
+    reorderHundredsZone();
+    pieceLayer.draw();
+  }
   return changed;
 }
+
 function checkBuildZones() {
   let changed;
   do {
@@ -366,6 +450,11 @@ function checkBuildZones() {
     if (composeTensInZone())     changed = true;
     if (composeHundredsInZone()) changed = true;
   } while (changed);
+
+  // Siempre reordenar si hay algo dentro
+  reorderTensZone();
+  reorderHundredsZone();
+
   updateStatus();
 }
 
@@ -374,8 +463,8 @@ function wireUI(){
   const $ = id => document.getElementById(id);
 
   $('btn-unit')   ?.addEventListener('click', ()=>{ const p = spawnPosUnit();    createUnit(p.x, p.y); });
-$('btn-ten')    ?.addEventListener('click', ()=>{ const p = spawnPosTen();     createTen(p.x, p.y); });
-$('btn-hundred')?.addEventListener('click', ()=>{ const p = spawnPosHundred(); createHundred(p.x, p.y); });
+  $('btn-ten')    ?.addEventListener('click', ()=>{ const p = spawnPosTen();     createTen(p.x, p.y); });
+  $('btn-hundred')?.addEventListener('click', ()=>{ const p = spawnPosHundred(); createHundred(p.x, p.y); });
   $('btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); });
   $('btn-compose')?.addEventListener('click', ()=>{ checkBuildZones(); });
   $('btn-say')    ?.addEventListener('click', ()=>{
@@ -399,15 +488,14 @@ $('btn-hundred')?.addEventListener('click', ()=>{ const p = spawnPosHundred(); c
   const bindZoom = (id, fn) => {
     const el = $(id);
     if (!el) return;
-    el.addEventListener('click', (ev)=>{ ev.preventDefault(); fn(); console.log(id,'click'); });
-    el.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); fn(); console.log(id,'pointerdown'); });
+    el.addEventListener('click', (ev)=>{ ev.preventDefault(); fn(); });
+    el.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); fn(); });
   };
   bindZoom('btn-zoom-in',  ()=> zoomStep(+1));
   bindZoom('btn-zoom-out', ()=> zoomStep(-1));
   bindZoom('btn-reset-view', ()=>{
     world.x = 0; world.y = 0; world.scale = 1;
     applyWorldTransform();
-    console.log('reset view');
   });
 }
 
