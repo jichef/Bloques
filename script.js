@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.5: auto-slot + composición fiable) =====
-console.log("Bloques v16.5");
+// ===== Bloques — script.js (v16.6: letras ES nativo + fixes) =====
+console.log("Bloques v16.6");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -120,7 +120,12 @@ function drawGrid() {
 const toCell = (n) => Math.round(n / GRID) * GRID;
 const snap   = (x,y)=>({x:toCell(x), y:toCell(y)});
 function speak(text){
-  try{ const u=new SpeechSynthesisUtterance(text); u.lang="es-ES"; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{}
+  try{
+    const u=new SpeechSynthesisUtterance(text);
+    u.lang="es-ES";
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  }catch{}
 }
 
 // ==== Geometría de zona: intersección / centro dentro ====
@@ -175,6 +180,42 @@ function countAll(){
   });
   return { units, tens, hundreds, total: units + 10*tens + 100*hundreds };
 }
+
+// === Conversor ES nativo (0..999999) ===
+function numEnLetras(n){
+  n = Math.floor(Number(n) || 0);
+  if (n === 0) return 'cero';
+
+  const U = ['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve',
+             'diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte',
+             'veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+  const T = ['','diez','veinte','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const C = ['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+
+  function _0_99(x){
+    if (x < 30) return U[x];
+    const d = Math.floor(x/10), u = x%10;
+    if (u === 0) return T[d];
+    if (d === 2) return 'veinti' + U[u];
+    return T[d] + ' y ' + U[u];
+  }
+  function _0_999(x){
+    if (x === 100) return 'cien';
+    const c = Math.floor(x/100), r = x%100;
+    if (c === 0) return _0_99(r);
+    if (r === 0) return C[c];
+    return C[c] + ' ' + _0_99(r);
+  }
+  if (n < 1000) return _0_999(n);
+  if (n < 1000000){
+    const miles = Math.floor(n/1000), r = n%1000;
+    const milesTxt = (miles === 1) ? 'mil' : _0_999(miles) + ' mil';
+    if (r === 0) return milesTxt;
+    return milesTxt + ' ' + _0_999(r);
+  }
+  return String(n);
+}
+
 function updateStatus(){
   const { units, tens, hundreds, total } = countAll();
   const enLetras = numEnLetras(total);
@@ -252,7 +293,6 @@ function onDragEnd(group){
 
     // Si ROZA la zona de decenas con una unidad → la forzamos a entrar y reordenamos
     if (zoneTenRect && type==='unit' && intersectsZone(group, zoneTenRect)) {
-      // meter dentro (posición base; luego reorden)
       group.position(snap(ZONES.tens.x, ZONES.tens.y));
       reorderTensZone();
       checkBuildZones(); // puede convertir 10U → 1D
@@ -383,13 +423,6 @@ function composeTensInZone() {
   if (changed) { reorderTensZone(); pieceLayer.draw(); }
   return changed;
 }
-function numEnLetras(n){
-  try {
-    if (typeof NumeroALetras === 'function') return NumeroALetras(n); // librería en español
-    if (typeof numeroALetras === 'function') return numeroALetras(n); // por si viene en minúscula
-  } catch(e) {}
-  return String(n);
-}
 
 function composeHundredsInZone() {
   if (!zoneHundRect) return false;
@@ -450,11 +483,14 @@ function wireUI(){
   $('btn-hundred')?.addEventListener('click', ()=>{ const p = spawnPosHundred(); createHundred(p.x, p.y); });
   $('btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); });
   $('btn-compose')?.addEventListener('click', ()=>{ checkBuildZones(); });
-$('btn-say')?.addEventListener('click', ()=>{
-  const {units,tens,hundreds,total}=countAll();
-  const enLetras = numEnLetras(total);
-  speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}. ${enLetras}.`);
-});
+
+  // 🔊 Leer número (usa countAll + numEnLetras)
+  $('btn-say')?.addEventListener('click', ()=>{
+    const {units,tens,hundreds,total}=countAll();
+    const enLetras = numEnLetras(total);
+    speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}. ${enLetras}.`);
+  });
+
   $('btn-challenge')?.addEventListener('click', ()=>{
     const n=Math.floor(Math.random()*900)+100;
     const ch=$('challenge'); if (ch) ch.textContent=`Forma el número ${n}`;
@@ -529,26 +565,6 @@ stage.on('dblclick dbltap', ()=>{
   applyWorldTransform();
 });
 
-// === Leer número en voz ===
-function leerNumero() {
-  const units = blocks.filter(b => b.type === 'unit').length;
-  const tens = blocks.filter(b => b.type === 'ten').length;
-  const hundreds = blocks.filter(b => b.type === 'hundred').length;
-  const total = units + tens * 10 + hundreds * 100;
-
-  const texto = numeroALetras(total);
-
-  if ('speechSynthesis' in window) {
-    const utterance = new SpeechSynthesisUtterance(texto);
-    utterance.lang = 'es-ES';
-    speechSynthesis.speak(utterance);
-  } else {
-    alert("Tu navegador no soporta síntesis de voz.");
-  }
-}
-
-// Conectar botón
-document.getElementById("btn-say").addEventListener("click", leerNumero);
 // ----- Resize & arranque -----
 function relayout(){
   stage.width(window.innerWidth);
