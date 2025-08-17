@@ -148,15 +148,12 @@ function getPieceGroups(){
 }
 
 // ----- Contador + descomposición -----
+// ----- Contador + descomposición (robusto con selectores) -----
 function countAll(){
-  let units=0, tens=0, hundreds=0;
-  const groups = getPieceGroups();
-  for (const n of groups){
-    const t = n.name() || n.getAttr('btype');
-    if (t==='unit') units++;
-    else if (t==='ten') tens++;
-    else if (t==='hundred') hundreds++;
-  }
+  // Selecciona solo Groups con name 'unit' / 'ten' / 'hundred'
+  const units    = pieceLayer.find('Group.unit').length;
+  const tens     = pieceLayer.find('Group.ten').length;
+  const hundreds = pieceLayer.find('Group.hundred').length;
   return { units, tens, hundreds, total: units + 10*tens + 100*hundreds };
 }
 
