@@ -1,17 +1,30 @@
 :root { --ui-bg: #ffffffcc; }
 * { box-sizing: border-box; }
-html, body { margin:0; height:100%; background:#f9f9f9; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+html, body { 
+  margin:0; 
+  height:100%; 
+  background:#f9f9f9; 
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; 
+}
 #container { position:fixed; inset:0; }
 
-/* Fuente personalizada */
+/* Fuente personalizada Escolar */
 @font-face {
   font-family: 'Escolar';
-  src: url('escolar_G.ttf') format('truetype');
-  font-weight: normal;
+  src:
+    url('escolar_G.woff2') format('woff2'),
+    url('escolar_G.ttf') format('truetype');
+  font-weight: 400;
   font-style: normal;
+  font-display: swap;
 }
 
-/* Controles */
+/* Usamos Escolar en status y breakdown */
+#status,
+#breakdown {
+  font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
 #controls {
   position: fixed;
   top: env(safe-area-inset-top, 8px);
@@ -25,11 +38,7 @@ html, body { margin:0; height:100%; background:#f9f9f9; font-family:system-ui,-a
 #controls button { font-size:16px; padding:10px 14px; border-radius:10px; border:none; background:#3498db; color:#fff; cursor:pointer; }
 #controls button:hover { background:#2e86c1; }
 #controls button:active { transform: translateY(1px); }
-#status { 
-  font-size: 18px; 
-  padding-top:2px; 
-  font-family: 'Escolar', system-ui, sans-serif; 
-}
+#status { font-size: 16px; padding-top:2px; }
 
 /* Panel inferior */
 #panel { position:fixed; left:0; right:0; bottom:0; transform:translateY(calc(100% - 44px)); transition:transform .25s ease; z-index:11; }
@@ -37,13 +46,7 @@ html, body { margin:0; height:100%; background:#f9f9f9; font-family:system-ui,-a
 #panel-toggle { width:100%; height:44px; border:none; background:#34495e; color:#fff; font-size:16px; cursor:pointer; }
 #panel-content { background:#fff; border-top:1px solid #e5e5e5; padding:12px 14px 16px; max-height:40vh; overflow:auto; }
 #panel h3, #panel h4 { margin:8px 0; }
-#breakdown { 
-  display:grid; 
-  grid-template-columns:auto 1fr; 
-  gap:6px 12px; 
-  font-size:16px; 
-  font-family: 'Escolar', system-ui, sans-serif;
-}
+#breakdown { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; font-size:16px; }
 #breakdown .label { color:#555; }
 #breakdown .value { font-weight:600; }
 
