@@ -6,10 +6,14 @@
         content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Bloques Web</title>
   <link rel="stylesheet" href="style.css" />
-  <script src="https://unpkg.com/konva@9/konva.min.js"></script>
-  <!-- Muy importante: <script src="https://cdn.jsdelivr.net/npm/numero-a-letras"></script>
 
-  <script src="script.js?v=15" defer></script>
+  <!-- Librerías -->
+  <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+  <!-- Muy importante: cargar la librería para escribir números en letras (español) -->
+  <script src="https://cdn.jsdelivr.net/npm/numero-a-letras"></script>
+
+  <!-- Tu lógica (defer para esperar al DOM listo) -->
+  <script src="script.js?v=16.5" defer></script>
 </head>
 <body>
   <div id="controls">
@@ -23,14 +27,14 @@
       <button id="btn-zoom-in">🔍＋</button>
       <button id="btn-zoom-out">🔍－</button>
       <button id="btn-reset-view">🧭 Reset</button>
+    </div>
 
-
-        </div>
     <div class="row">
       <button id="btn-say">🔊 Leer número</button>
       <button id="btn-challenge">🎯 Reto</button>
       <span id="challenge"></span>
     </div>
+
     <div id="status">Total: 0 — 0 centenas, 0 decenas, 0 unidades</div>
   </div>
 
@@ -45,6 +49,7 @@
         <div class="label">Decenas</div><div class="value">0 × 10 = 0</div>
         <div class="label">Unidades</div><div class="value">0 × 1 = 0</div>
         <div class="label">Total</div><div class="value">0</div>
+        <!-- La fila "En letras" la genera script.js en updateStatus() -->
       </div>
     </div>
   </div>
