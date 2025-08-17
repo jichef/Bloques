@@ -6,8 +6,9 @@
         content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Bloques Web</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- Konva primero -->
   <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+  <!-- Muy importante: defer -->
+  <script src="script.js" defer></script>
 </head>
 <body>
   <div id="controls">
@@ -38,16 +39,7 @@
         <div class="label">Unidades</div><div class="value">0 × 1 = 0</div>
         <div class="label">Total</div><div class="value">0</div>
       </div>
-      <h4>Consejos</h4>
-      <ul>
-        <li>Doble toque en <b>centena</b> ⇒ 10 decenas.</li>
-        <li>Doble toque en <b>decena</b> ⇒ 10 unidades.</li>
-        <li>Usa <b>🧩 Construir</b> para agrupar automáticamente.</li>
-      </ul>
     </div>
   </div>
-
-  <!-- Nuestro JS al final (sin inline handlers) -->
-  <script src="script.js"></script>
 </body>
 </html>
