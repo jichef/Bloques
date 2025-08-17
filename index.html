@@ -1,1 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  <title>Bloques Web</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Konva.js -->
+  <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+</head>
+<body>
+  <div id="controls">
+    <div class="row">
+      <button onclick="addUnit()">➕ Unidad</button>
+      <button onclick="addTen()">➕ Decena</button>
+      <button onclick="addHundred()">➕ Centena</button>
+      <button onclick="autoCompose()">🧩 Construir</button>
+      <button onclick="clearAll()">🧹 Limpiar</button>
+    </div>
+    <div class="row">
+      <button onclick="sayCurrent()">🔊 Leer número</button>
+      <button onclick="newChallenge()">🎯 Reto</button>
+      <span id="challenge"></span>
+    </div>
+    <div id="status"></div>
+  </div>
 
+  <div id="container"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
