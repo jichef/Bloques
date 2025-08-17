@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.9: zonas centradas + no solape + intro fade/zoom) =====
-console.log("Bloques v16.9");
+// ===== Bloques — script.js (v16.9.1: bucles de array + zonas centradas + intro fade/zoom) =====
+console.log("Bloques v16.9.1");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -89,9 +89,9 @@ function clampToVisible(x, y, w, h){
   const CY = Math.min(Math.max(y, r.y), r.y + r.h - h);
   return snap(CX, CY);
 }
-function spawnPosUnit(){ // preferencia: junto a la zona de decenas (derecha) pero fuera
+function spawnPosUnit(){
   const z = ZONES?.tens ?? { x: WORLD_CENTER.x - 5*GRID, y: WORLD_CENTER.y - 6*GRID };
-  return clampToVisible(z.x + 12*GRID, z.y, GRID, GRID); // 2 celdas a la derecha
+  return clampToVisible(z.x + 12*GRID, z.y, GRID, GRID); // a la derecha de la zona
 }
 function spawnPosTen(){
   const z = ZONES?.hund ?? { x: WORLD_CENTER.x - 5*GRID, y: WORLD_CENTER.y - 5*GRID };
@@ -156,7 +156,6 @@ let zoneTenRect = null;
 let zoneHundRect = null;
 
 function computeZones() {
-  // Centenas centrada (10×10) en WORLD_CENTER
   const hund = {
     x: WORLD_CENTER.x - 5*GRID,
     y: WORLD_CENTER.y - 5*GRID,
@@ -164,10 +163,9 @@ function computeZones() {
     h: GRID * 10,
     label: "Zona Centenas (10×10)"
   };
-  // Decenas (1×10) centrada horizontalmente y encima de la de centenas
   const tens = {
     x: WORLD_CENTER.x - 5*GRID,
-    y: hund.y - GRID * 2, // separada 2 celdas arriba
+    y: hund.y - GRID * 2,
     w: GRID * 10,
     h: GRID * 1,
     label: "Zona Decenas (1×10)"
@@ -176,9 +174,7 @@ function computeZones() {
 }
 function drawZones() {
   uiLayer.destroyChildren();
-
-  // volver a poner el fadeRect porque lo limpiamos
-  uiLayer.add(fadeRect);
+  uiLayer.add(fadeRect); // mantener el fade arriba
 
   const { tens, hund } = ZONES;
   zoneTenRect = new Konva.Rect({ x:tens.x, y:tens.y, width:tens.w, height:tens.h, stroke: ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill: ZONE_FILL, listening:false });
@@ -192,57 +188,72 @@ function drawZones() {
 // ----- Helpers de piezas -----
 function getPieceGroups(){
   const out = [];
-  pieceLayer.find('Group').each(g=>{
+  const groups = pieceLayer.find('Group') || [];
+  for (let i=0; i<groups.length; i++){
+    const g = groups[i];
     const t = (g.name && g.name()) || (g.getAttr && g.getAttr('btype'));
     if (t === 'unit' || t === 'ten' || t === 'hundred') out.push(g);
-  });
+  }
   return out;
 }
 function overlapsAny(target, skipId=null){
   const a = nodeBoxAbs(target);
-  let hit = false;
-  pieceLayer.find('Group').each(g=>{
-    if (hit) return;
-    if (skipId && g._id === skipId) return;
-    const t = (g.name && g.name()) || g.getAttr('btype');
-    if (!t) return;
+  const groups = pieceLayer.find('Group') || [];
+  for (let i=0; i<groups.length; i++){
+    const g = groups[i];
+    if (skipId && g._id === skipId) continue;
+    const t = (g.name && g.name()) || (g.getAttr && g.getAttr('btype'));
+    if (!t) continue;
     const b = nodeBoxAbs(g);
-    if (rectsIntersect(a, b)) hit = true;
-  });
-  return hit;
+    if (rectsIntersect(a, b)) return true;
+  }
+  return false;
 }
 function findFreeSpot(pref, w, h){
-  // Espiral simple desde pref hasta hallar hueco
-  const MAX_STEPS = 200;
-  let x = toCell(pref.x), y = toCell(pref.y);
+  const MAX_STEPS = 240;
   const step = GRID;
+  const baseX = toCell(pref.x);
+  const baseY = toCell(pref.y);
+  let ring = 0, dx = 0, dy = 0, dir = 0, stepsInDir = 1, stepCount = 0, turns = 0;
+
+  function pos(){ return { x: baseX + dx*step, y: baseY + dy*step }; }
+
   for (let k=0; k<MAX_STEPS; k++){
-    const p = { x, y };
-    const tmp = new Konva.Rect({ x:p.x, y:p.y, width:w, height:h });
-    if (!overlapsAny(tmp)) return p;
-    // mover en patrón (→ ↓ ← ← ↑ ↑ → → → ...)
-    const ring = Math.floor((k+2)/2);
-    const dir = k % 4;
-    if (dir === 0) x += step; else if (dir === 1) y += step;
-    else if (dir === 2) x -= step; else y -= step;
-    // expandir hacia fuera cada dos pasos
-    x = pref.x + (Math.sign(x - pref.x) * ring * step);
-    y = pref.y + (Math.sign(y - pref.y) * ring * step);
-    x = toCell(x); y = toCell(y);
+    const p = pos();
+    const tmp = new Konva.Rect({ x: toCell(p.x), y: toCell(p.y), width: w, height: h });
+    if (!overlapsAny(tmp)) return snap(p.x, p.y);
+
+    // caminar en espiral cuadrada
+    if (dir === 0) dx++;          // →
+    else if (dir === 1) dy++;     // ↓
+    else if (dir === 2) dx--;     // ←
+    else if (dir === 3) dy--;     // ↑
+
+    stepCount++;
+    if (stepCount >= stepsInDir){
+      stepCount = 0;
+      dir = (dir + 1) % 4;
+      turns++;
+      if (turns % 2 === 0){ // cada dos giros crece el anillo
+        ring++;
+        stepsInDir = ring + 1;
+      }
+    }
   }
-  return snap(pref.x, pref.y);
+  const p = pos();
+  return snap(p.x, p.y);
 }
 
 // ----- Contador + descomposición -----
 function countAll(){
   const pieces = getPieceGroups();
   let units = 0, tens = 0, hundreds = 0;
-  pieces.forEach(g=>{
+  for (const g of pieces){
     const t = (g.name && g.name()) || g.getAttr('btype');
     if (t==='unit') units++;
     else if (t==='ten') tens++;
     else if (t==='hundred') hundreds++;
-  });
+  }
   return { units, tens, hundreds, total: units + 10*tens + 100*hundreds };
 }
 
@@ -307,12 +318,17 @@ function reorderTensZone(){
   if (!zoneTenRect) return;
   const z = ZONES.tens;
   const units = [];
-  pieceLayer.find('Group').each(g=>{
+  const groups = pieceLayer.find('Group') || [];
+  for (let i=0; i<groups.length; i++){
+    const g = groups[i];
     const t=(g.name&&g.name())||g.getAttr('btype');
     if (t==='unit' && centerInZone(g, zoneTenRect)) units.push(g);
-  });
+  }
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
-  units.forEach((g,i)=>{ g.position(snap(z.x + Math.min(i,9)*GRID, z.y)); });
+  for (let i=0; i<units.length; i++){
+    const g = units[i];
+    g.position(snap(z.x + Math.min(i,9)*GRID, z.y));
+  }
   pieceLayer.batchDraw();
   updateStatus();
 }
@@ -320,16 +336,21 @@ function reorderHundredsZone(){
   if (!zoneHundRect) return;
   const z = ZONES.hund;
   const tens=[], units=[];
-  pieceLayer.find('Group').each(g=>{
+  const groups = pieceLayer.find('Group') || [];
+  for (let i=0; i<groups.length; i++){
+    const g = groups[i];
     const t=(g.name&&g.name())||g.getAttr('btype');
-    if (!centerInZone(g, zoneHundRect)) return;
+    if (!centerInZone(g, zoneHundRect)) continue;
     if (t==='ten') tens.push(g); else if (t==='unit') units.push(g);
-  });
+  }
   tens.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
-  tens.forEach((g,i)=>{ g.position(snap(z.x, z.y + i*GRID)); });
+  for (let i=0; i<tens.length; i++) tens[i].position(snap(z.x, z.y + i*GRID));
   const startRow=tens.length;
-  units.forEach((g,i)=>{ const row=startRow+Math.floor(i/10), col=i%10; g.position(snap(z.x+col*GRID, z.y+row*GRID)); });
+  for (let i=0; i<units.length; i++){
+    const row=startRow+Math.floor(i/10), col=i%10;
+    units[i].position(snap(z.x+col*GRID, z.y+row*GRID));
+  }
   pieceLayer.batchDraw();
   updateStatus();
 }
@@ -392,47 +413,90 @@ function createHundred(x,y){
 function composeTensInZone() {
   if (!zoneTenRect) return false;
   let changed = false;
+
   const rows = new Map();
-  pieceLayer.find('Group').each(n=>{
+  const groups = pieceLayer.find('Group') || [];
+  for (let i=0; i<groups.length; i++){
+    const n = groups[i];
     const t = (n.name&&n.name())||n.getAttr('btype');
-    if (t!=='unit' || !centerInZone(n, zoneTenRect)) return;
+    if (t!=='unit' || !centerInZone(n, zoneTenRect)) continue;
     const rowY = toCell(n.y());
     if (!rows.has(rowY)) rows.set(rowY, new Map());
     rows.get(rowY).set(toCell(n.x()), n);
-  });
+  }
+
   rows.forEach((mapX, rowY)=>{
     const xs = Array.from(mapX.keys()).sort((a,b)=>a-b);
     for (let i=0; i<=xs.length-10; i++){
       let ok=true; for (let k=0;k<10;k++){ if (!mapX.has(xs[i]+k*GRID)) { ok=false; break; } }
-      if (ok){ const nodes=[]; for (let k=0;k<10;k++) nodes.push(mapX.get(xs[i]+k*GRID)); nodes.forEach(n=>n.destroy()); createTen(xs[i], rowY); changed = true; }
+      if (ok){
+        const nodes=[]; for (let k=0;k<10;k++) nodes.push(mapX.get(xs[i]+k*GRID));
+        for (const n of nodes) n.destroy();
+        createTen(xs[i], rowY);
+        changed = true;
+      }
     }
   });
+
   if (!changed) {
-    const pool=[]; pieceLayer.find('Group').each(n=>{ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneTenRect)) pool.push(n); });
-    if (pool.length>=10){ const anchor=snap(pool[0].x(), pool[0].y()); for (let i=0;i<10;i++) pool[i].destroy(); createTen(anchor.x, anchor.y); changed = true; }
+    const pool=[];
+    for (let i=0; i<groups.length; i++){
+      const n = groups[i];
+      const t=(n.name&&n.name())||n.getAttr('btype');
+      if (t==='unit' && centerInZone(n, zoneTenRect)) pool.push(n);
+    }
+    if (pool.length>=10){
+      const anchor=snap(pool[0].x(), pool[0].y());
+      for (let i=0;i<10;i++) pool[i].destroy();
+      createTen(anchor.x, anchor.y);
+      changed = true;
+    }
   }
+
   if (changed) { reorderTensZone(); pieceLayer.draw(); }
   return changed;
 }
 function composeHundredsInZone() {
   if (!zoneHundRect) return false;
   let changed = false;
+
   while (true) {
-    const units=[]; pieceLayer.find('Group').each(n=>{ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneHundRect)) units.push(n); });
+    const units=[];
+    const groups = pieceLayer.find('Group') || [];
+    for (let i=0; i<groups.length; i++){
+      const n = groups[i];
+      const t=(n.name&&n.name())||n.getAttr('btype');
+      if (t==='unit' && centerInZone(n, zoneHundRect)) units.push(n);
+    }
     if (units.length < 10) break;
-    const anchor = snap(units[0].x(), units[0].y()); for (let i=0;i<10;i++) units[i].destroy(); createTen(anchor.x, anchor.y); changed = true;
+    const anchor = snap(units[0].x(), units[0].y());
+    for (let i=0;i<10;i++) units[i].destroy();
+    createTen(anchor.x, anchor.y);
+    changed = true;
   }
+
   while (true) {
-    const tens=[]; pieceLayer.find('Group').each(n=>{ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='ten' && centerInZone(n, zoneHundRect)) tens.push(n); });
+    const tens=[];
+    const groups = pieceLayer.find('Group') || [];
+    for (let i=0; i<groups.length; i++){
+      const n = groups[i];
+      const t=(n.name&&n.name())||n.getAttr('btype');
+      if (t==='ten' && centerInZone(n, zoneHundRect)) tens.push(n);
+    }
     if (tens.length < 10) break;
-    const anchor = snap(tens[0].x(), tens[0].y()); for (let i=0;i<10;i++) tens[i].destroy(); createHundred(anchor.x, anchor.y); changed = true;
+    const anchor = snap(tens[0].x(), tens[0].y());
+    for (let i=0;i<10;i++) tens[i].destroy();
+    createHundred(anchor.x, anchor.y);
+    changed = true;
   }
+
   if (changed) { reorderHundredsZone(); pieceLayer.draw(); }
   return changed;
 }
 function checkBuildZones() {
   let changed;
-  do { changed = false;
+  do {
+    changed = false;
     if (composeTensInZone())     changed = true;
     if (composeHundredsInZone()) changed = true;
   } while (changed);
@@ -500,7 +564,7 @@ function relayout(){
 
   drawGrid(); computeZones(); drawZones();
 
-  // mantener centrado el mundo en el centro
+  // mantener centrado el mundo
   applyWorldTransform();
   setCameraAt(WORLD_CENTER, world.scale);
 
@@ -510,19 +574,14 @@ window.addEventListener("resize", relayout);
 
 // ----- Intro: fade + zoom-out -----
 function introAnimation(){
-  // cámara al centro con zoom inicial
   setCameraAt(WORLD_CENTER, START_ZOOM);
-
   const t0 = performance.now();
   function step(now){
     const t = Math.min(1, (now - t0) / INTRO_MS);
     const s = START_ZOOM + (END_ZOOM - START_ZOOM) * t;
     setCameraAt(WORLD_CENTER, s);
-
-    // fade de blanco a transparente
     fadeRect.opacity(1 - t);
     uiLayer.batchDraw();
-
     if (t < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
@@ -533,7 +592,6 @@ drawGrid();
 computeZones();
 drawZones();
 wireUI();
-// arrancar centrado y con animación de entrada
 introAnimation();
 updateStatus();
 pieceLayer.draw();
