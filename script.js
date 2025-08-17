@@ -1,14 +1,12 @@
-/* ====== Parámetros ====== */
+// ===== Parámetros y fixes =====
 const GRID = 32;
 const UNIT_SIZE = GRID;
 const COLORS = { unit: "blue", ten: "red", hundred: "green" };
-const GRID_COLOR = "#c7c7c7";   // más contraste
+const GRID_COLOR = "#c7c7c7";
 const DOUBLE_TAP_MS = 300;
+Konva.pixelRatio = 1; // evitar HiDPI raro
 
-/* ====== Fix HiDPI ====== */
-Konva.pixelRatio = 1;
-
-/* ====== Escenario ====== */
+// ===== Stage y capas =====
 const stage = new Konva.Stage({
   container: "container",
   width: window.innerWidth,
@@ -19,48 +17,29 @@ const layer = new Konva.Layer();
 stage.add(gridLayer);
 stage.add(layer);
 
-/* ====== Panel desplegable ====== */
-function togglePanel() {
-  const panel = document.getElementById("panel");
-  const btn = document.getElementById("panel-toggle");
-  const open = panel.classList.toggle("open");
-  if (open) panel.classList.remove("closed");
-  btn.textContent = open ? "⬇︎ Ocultar detalles" : "⬆︎ Detalles";
-  btn.setAttribute("aria-expanded", String(open));
-  panel.setAttribute("aria-hidden", String(!open));
-}
+// ===== Utilidades =====
+const toCell = (n) => Math.round(n / GRID) * GRID;
+const snapToGrid = (x, y) => ({ x: toCell(x), y: toCell(y) });
+function speak(t){ try{ const u=new SpeechSynthesisUtterance(t); u.lang="es-ES"; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch{} }
+const centerPos = () => ({ x: toCell(stage.width()/2), y: toCell(stage.height()/2) });
 
-/* ====== Cuadrícula ====== */
+// ===== Cuadrícula =====
 function drawGrid() {
   gridLayer.destroyChildren();
   const w = stage.width(), h = stage.height();
-
   for (let x = 0; x <= w; x += GRID) {
-    const X = Math.round(x) + 0.5; // nitidez
-    gridLayer.add(new Konva.Line({
-      points: [X, 0, X, h], stroke: GRID_COLOR, strokeWidth: 1, listening: false
-    }));
+    const X = Math.round(x) + 0.5;
+    gridLayer.add(new Konva.Line({ points: [X,0,X,h], stroke: GRID_COLOR, strokeWidth: 1, listening:false }));
   }
   for (let y = 0; y <= h; y += GRID) {
     const Y = Math.round(y) + 0.5;
-    gridLayer.add(new Konva.Line({
-      points: [0, Y, w, Y], stroke: GRID_COLOR, strokeWidth: 1, listening: false
-    }));
+    gridLayer.add(new Konva.Line({ points: [0,Y,w,Y], stroke: GRID_COLOR, strokeWidth: 1, listening:false }));
   }
   gridLayer.draw();
 }
 
-/* ====== Utils ====== */
-function toCell(n) { return Math.round(n / GRID) * GRID; }
-function snapToGrid(x, y) { return { x: toCell(x), y: toCell(y) }; }
-function speak(t) {
-  try { const u=new SpeechSynthesisUtterance(t); u.lang="es-ES";
-        speechSynthesis.cancel(); speechSynthesis.speak(u);} catch {}
-}
-function centerPos(){ return { x: toCell(stage.width()/2), y: toCell(stage.height()/2) }; }
-
-/* ====== Estado + Descomposición ====== */
-function countAll() {
+// ===== Estado y descomposición =====
+function countAll(){
   let units=0,tens=0,hundreds=0;
   layer.children.each(n=>{
     const t=n.getAttr("btype");
@@ -68,24 +47,22 @@ function countAll() {
     else if(t==="ten") tens++;
     else if(t==="hundred") hundreds++;
   });
-  return { units, tens, hundreds, total: units + 10*tens + 100*hundreds };
+  return { units,tens,hundreds,total: units + 10*tens + 100*hundreds };
 }
-function updateStatus() {
-  const { units, tens, hundreds, total } = countAll();
-  document.getElementById("status").innerText =
-    `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
-  const b = document.getElementById("breakdown");
-  if (b) {
+function updateStatus(){
+  const {units,tens,hundreds,total}=countAll();
+  document.getElementById("status").innerText = `Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades`;
+  const b=document.getElementById("breakdown");
+  if(b){
     b.innerHTML = `
       <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
       <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
       <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
-      <div class="label">Total</div><div class="value">${total}</div>
-    `;
+      <div class="label">Total</div><div class="value">${total}</div>`;
   }
 }
 
-/* ====== Drag & doble toque ====== */
+// ===== Interacción piezas =====
 function commonDragBehavior(shape){
   shape.on("dragend", ()=>{
     shape.position(snapToGrid(shape.x(), shape.y()));
@@ -99,20 +76,17 @@ function addDoubleTapHandler(shape, onDT){
   shape.on("click", ()=>{ const now=Date.now(); if(now-lastClick<DOUBLE_TAP_MS) onDT(); lastClick=now; });
 }
 
-/* ====== Piezas ====== */
+// ===== Piezas =====
 function createUnit(x,y){
   const p=snapToGrid(x,y);
-  const rect=new Konva.Rect({ x:p.x,y:p.y,width:UNIT_SIZE,height:UNIT_SIZE,
-    fill:COLORS.unit, draggable:true, strokeEnabled:false });
+  const rect=new Konva.Rect({ x:p.x,y:p.y,width:UNIT_SIZE,height:UNIT_SIZE,fill:COLORS.unit,draggable:true,strokeEnabled:false });
   rect.setAttr("btype","unit");
   commonDragBehavior(rect);
   layer.add(rect); layer.draw(); updateStatus();
-  return rect;
 }
 function createTen(x,y){
   const p=snapToGrid(x,y);
-  const rect=new Konva.Rect({ x:p.x,y:p.y,width:10*GRID,height:GRID,
-    fill:COLORS.ten, draggable:true, strokeEnabled:false });
+  const rect=new Konva.Rect({ x:p.x,y:p.y,width:10*GRID,height:GRID,fill:COLORS.ten,draggable:true,strokeEnabled:false });
   rect.setAttr("btype","ten");
   commonDragBehavior(rect);
   addDoubleTapHandler(rect, ()=>{
@@ -122,12 +96,10 @@ function createTen(x,y){
     layer.draw(); updateStatus();
   });
   layer.add(rect); layer.draw(); updateStatus();
-  return rect;
 }
 function createHundred(x,y){
   const p=snapToGrid(x,y);
-  const rect=new Konva.Rect({ x:p.x,y:p.y,width:10*GRID,height:10*GRID,
-    fill:COLORS.hundred, draggable:true, strokeEnabled:false });
+  const rect=new Konva.Rect({ x:p.x,y:p.y,width:10*GRID,height:10*GRID,fill:COLORS.hundred,draggable:true,strokeEnabled:false });
   rect.setAttr("btype","hundred");
   commonDragBehavior(rect);
   addDoubleTapHandler(rect, ()=>{
@@ -137,36 +109,9 @@ function createHundred(x,y){
     layer.draw(); updateStatus();
   });
   layer.add(rect); layer.draw(); updateStatus();
-  return rect;
 }
 
-/* ====== Botones (exponer al scope global) ====== */
-function addUnit(){ const c=centerPos(); createUnit(c.x,c.y); }
-function addTen(){ const c=centerPos(); createTen(c.x-5*GRID,c.y); }
-function addHundred(){ const c=centerPos(); createHundred(c.x-5*GRID, c.y-5*GRID); }
-function clearAll(){ layer.destroyChildren(); layer.draw(); updateStatus(); }
-function autoCompose(){
-  let changed=false;
-  do{
-    changed=false;
-    let grid=indexByGrid(); if(tryComposeTensFromUnits(grid)) changed=true;
-    grid=indexByGrid(); if(tryComposeHundredsFromTens(grid)) changed=true;
-    grid=indexByGrid(); if(tryComposeHundredsFromUnits(grid)) changed=true;
-  }while(changed);
-  layer.draw(); updateStatus();
-}
-function sayCurrent(){
-  const {units,tens,hundreds,total}=countAll();
-  speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}.`);
-}
-function newChallenge(){
-  const target=Math.floor(Math.random()*900)+100;
-  const el=document.getElementById("challenge");
-  el.textContent=`Forma el número ${target}`;
-  speak(`Reto: forma el número ${target}`);
-}
-
-/* ====== Índices y composición ====== */
+// ===== Composición automática =====
 function indexByGrid(){
   const m=new Map();
   layer.children.each(n=>{
@@ -236,21 +181,49 @@ function tryComposeHundredsFromUnits(grid){
   });
   return composed.length>0;
 }
-
-/* ====== Resize & arranque ====== */
-function resize(){
-  stage.width(window.innerWidth);
-  stage.height(window.innerHeight);
-  drawGrid(); layer.draw();
+function autoCompose(){
+  let changed=false;
+  do{
+    changed=false;
+    let grid=indexByGrid(); if(tryComposeTensFromUnits(grid)) changed=true;
+    grid=indexByGrid(); if(tryComposeHundredsFromTens(grid)) changed=true;
+    grid=indexByGrid(); if(tryComposeHundredsFromUnits(grid)) changed=true;
+  }while(changed);
+  layer.draw(); updateStatus();
 }
+
+// ===== Panel =====
+function togglePanel(){
+  const panel=document.getElementById("panel");
+  const btn=document.getElementById("panel-toggle");
+  const open=panel.classList.toggle("open");
+  if(open) panel.classList.remove("closed");
+  btn.textContent=open?"⬇︎ Ocultar detalles":"⬆︎ Detalles";
+  btn.setAttribute("aria-expanded", String(open));
+  panel.setAttribute("aria-hidden", String(!open));
+}
+
+// ===== Enlazar botones SIN onclick inline =====
+function wireUI(){
+  document.getElementById("btn-unit").addEventListener("click", ()=>{ const c=centerPos(); createUnit(c.x,c.y); });
+  document.getElementById("btn-ten").addEventListener("click",  ()=>{ const c=centerPos(); createTen(c.x-5*GRID,c.y); });
+  document.getElementById("btn-hundred").addEventListener("click", ()=>{ const c=centerPos(); createHundred(c.x-5*GRID,c.y-5*GRID); });
+  document.getElementById("btn-clear").addEventListener("click", clearAll);
+  document.getElementById("btn-compose").addEventListener("click", autoCompose);
+  document.getElementById("btn-say").addEventListener("click", sayCurrent);
+  document.getElementById("btn-challenge").addEventListener("click", newChallenge);
+  document.getElementById("panel-toggle").addEventListener("click", togglePanel);
+}
+function clearAll(){ layer.destroyChildren(); layer.draw(); updateStatus(); }
+function sayCurrent(){ const {units,tens,hundreds,total}=countAll(); speak(`Tienes ${hundreds} centenas, ${tens} decenas y ${units} unidades. Total: ${total}.`); }
+function newChallenge(){ const target=Math.floor(Math.random()*900)+100; const el=document.getElementById("challenge"); el.textContent=`Forma el número ${target}`; speak(`Reto: forma el número ${target}`); }
+
+// ===== Resize y arranque =====
+function resize(){ stage.width(window.innerWidth); stage.height(window.innerHeight); drawGrid(); layer.draw(); }
+
 window.addEventListener("resize", resize);
-
-// --- IMPORTANTE: exponer funciones para que los botones las encuentren ---
-Object.assign(window, {
-  addUnit, addTen, addHundred, clearAll, autoCompose,
-  sayCurrent, newChallenge, togglePanel
+window.addEventListener("DOMContentLoaded", ()=>{
+  drawGrid();
+  wireUI();       // 👈 ahora sí conectamos los botones
+  updateStatus();
 });
-
-// Dibuja cuadrícula y estado al cargar
-drawGrid();
-updateStatus();
