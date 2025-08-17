@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v16.8.4: NodeCollection.each en lugar de toArray) =====
-console.log("Bloques v16.8.4");
+// ===== Bloques — script.js (v16.8.5: compat find() universal + fixes) =====
+console.log("Bloques v16.8.5");
 
 const GRID = 32;
 Konva.pixelRatio = 1;
@@ -137,27 +137,49 @@ function drawZones() {
   uiLayer.draw();
 }
 
+// ===== Normalizador universal para collections de Konva / arrays =====
+function collectionToArray(coll){
+  // 1) Si ya es array:
+  if (Array.isArray(coll)) return coll;
+  // 2) Si tiene length indexable:
+  if (coll && typeof coll.length === 'number') {
+    const out = [];
+    for (let i = 0; i < coll.length; i++) out.push(coll[i]);
+    return out;
+  }
+  // 3) Konva NodeCollection con .each
+  if (coll && typeof coll.each === 'function') {
+    const out = [];
+    coll.each(n => out.push(n));
+    return out;
+  }
+  // 4) Konva NodeCollection con .toArray
+  if (coll && typeof coll.toArray === 'function') {
+    try { return coll.toArray(); } catch { /* nada */ }
+  }
+  // 5) Último recurso: vacío
+  return [];
+}
+
 // ----- Helpers de piezas (robusto) -----
-// IMPORTANTE: en Konva 9, find() devuelve NodeCollection. Usar .each(), no .toArray()
 function getPieceGroups(){
-  const out = [];
-  pieceLayer.find('Group').each(g=>{
+  const groups = collectionToArray(pieceLayer.find('Group'));
+  return groups.filter(g=>{
     const t = (g.name && g.name()) || (g.getAttr && g.getAttr('btype'));
-    if (t === 'unit' || t === 'ten' || t === 'hundred') out.push(g);
+    return t === 'unit' || t === 'ten' || t === 'hundred';
   });
-  return out;
 }
 
 // ----- Contador + descomposición (robusto) -----
 function countAll(){
   const pieces = getPieceGroups();
   let units = 0, tens = 0, hundreds = 0;
-  pieces.forEach(g=>{
-    const t = (g.name && g.name()) || g.getAttr('btype');
+  for (const g of pieces){
+    const t = (g.name && g.name()) || (g.getAttr && g.getAttr('btype'));
     if (t==='unit') units++;
     else if (t==='ten') tens++;
     else if (t==='hundred') hundreds++;
-  });
+  }
   return { units, tens, hundreds, total: units + 10*tens + 100*hundreds };
 }
 
@@ -222,10 +244,10 @@ function reorderTensZone(){
   if (!zoneTenRect) return;
   const z = ZONES.tens;
   const units = [];
-  getPieceGroups().forEach(g=>{
-    const t=(g.name&&g.name())||g.getAttr('btype');
+  for (const g of getPieceGroups()){
+    const t=(g.name&&g.name())|| (g.getAttr&&g.getAttr('btype'));
     if (t==='unit' && centerInZone(g, zoneTenRect)) units.push(g);
-  });
+  }
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   units.forEach((g,i)=>{ g.position(snap(z.x + Math.min(i,9)*GRID, z.y)); });
   pieceLayer.batchDraw();
@@ -235,11 +257,11 @@ function reorderHundredsZone(){
   if (!zoneHundRect) return;
   const z = ZONES.hund;
   const tens=[], units=[];
-  getPieceGroups().forEach(g=>{
-    const t=(g.name&&g.name())||g.getAttr('btype');
-    if (!centerInZone(g, zoneHundRect)) return;
+  for (const g of getPieceGroups()){
+    const t=(g.name&&g.name())|| (g.getAttr&&g.getAttr('btype'));
+    if (!centerInZone(g, zoneHundRect)) continue;
     if (t==='ten') tens.push(g); else if (t==='unit') units.push(g);
-  });
+  }
   tens.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   tens.forEach((g,i)=>{ g.position(snap(z.x, z.y + i*GRID)); });
@@ -253,7 +275,7 @@ function reorderHundredsZone(){
 function onDragEnd(group){
   group.on("dragend", ()=>{
     group.position(snap(group.x(), group.y()));
-    const type = (group.name&&group.name()) || group.getAttr('btype');
+    const type = (group.name&&group.name()) || (group.getAttr&&group.getAttr('btype'));
     if (zoneTenRect && type==='unit' && intersectsZone(group, zoneTenRect)) {
       group.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); checkBuildZones();
     }
@@ -305,23 +327,37 @@ function composeTensInZone() {
   if (!zoneTenRect) return false;
   let changed = false;
   const rows = new Map();
-  getPieceGroups().forEach(n=>{
-    const t = (n.name&&n.name())||n.getAttr('btype');
-    if (t!=='unit' || !centerInZone(n, zoneTenRect)) return;
+  for (const n of getPieceGroups()){
+    const t = (n.name&&n.name())|| (n.getAttr&&n.getAttr('btype'));
+    if (t!=='unit' || !centerInZone(n, zoneTenRect)) continue;
     const rowY = toCell(n.y());
     if (!rows.has(rowY)) rows.set(rowY, new Map());
     rows.get(rowY).set(toCell(n.x()), n);
-  });
+  }
   rows.forEach((mapX, rowY)=>{
     const xs = Array.from(mapX.keys()).sort((a,b)=>a-b);
     for (let i=0; i<=xs.length-10; i++){
       let ok=true; for (let k=0;k<10;k++){ if (!mapX.has(xs[i]+k*GRID)) { ok=false; break; } }
-      if (ok){ const nodes=[]; for (let k=0;k<10;k++) nodes.push(mapX.get(xs[i]+k*GRID)); nodes.forEach(n=>n.destroy()); createTen(xs[i], rowY); changed = true; }
+      if (ok){
+        const nodes=[]; for (let k=0;k<10;k++) nodes.push(mapX.get(xs[i]+k*GRID));
+        nodes.forEach(n=>n.destroy());
+        createTen(xs[i], rowY);
+        changed = true;
+      }
     }
   });
   if (!changed) {
-    const pool=[]; getPieceGroups().forEach(n=>{ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneTenRect)) pool.push(n); });
-    if (pool.length>=10){ const anchor=snap(pool[0].x(), pool[0].y()); for (let i=0;i<10;i++) pool[i].destroy(); createTen(anchor.x, anchor.y); changed = true; }
+    const pool=[];
+    for (const n of getPieceGroups()){
+      const t=(n.name&&n.name())|| (n.getAttr&&n.getAttr('btype'));
+      if (t==='unit' && centerInZone(n, zoneTenRect)) pool.push(n);
+    }
+    if (pool.length>=10){
+      const anchor=snap(pool[0].x(), pool[0].y());
+      for (let i=0;i<10;i++) pool[i].destroy();
+      createTen(anchor.x, anchor.y);
+      changed = true;
+    }
   }
   if (changed) { reorderTensZone(); pieceLayer.draw(); }
   return changed;
@@ -330,14 +366,28 @@ function composeHundredsInZone() {
   if (!zoneHundRect) return false;
   let changed = false;
   while (true) {
-    const units=[]; getPieceGroups().forEach(n=>{ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='unit' && centerInZone(n, zoneHundRect)) units.push(n); });
+    const units=[];
+    for (const n of getPieceGroups()){
+      const t=(n.name&&n.name())|| (n.getAttr&&n.getAttr('btype'));
+      if (t==='unit' && centerInZone(n, zoneHundRect)) units.push(n);
+    }
     if (units.length < 10) break;
-    const anchor = snap(units[0].x(), units[0].y()); for (let i=0;i<10;i++) units[i].destroy(); createTen(anchor.x, anchor.y); changed = true;
+    const anchor = snap(units[0].x(), units[0].y());
+    for (let i=0;i<10;i++) units[i].destroy();
+    createTen(anchor.x, anchor.y);
+    changed = true;
   }
   while (true) {
-    const tens=[]; getPieceGroups().forEach(n=>{ const t=(n.name&&n.name())||n.getAttr('btype'); if (t==='ten' && centerInZone(n, zoneHundRect)) tens.push(n); });
+    const tens=[];
+    for (const n of getPieceGroups()){
+      const t=(n.name&&n.name())|| (n.getAttr&&n.getAttr('btype'));
+      if (t==='ten' && centerInZone(n, zoneHundRect)) tens.push(n);
+    }
     if (tens.length < 10) break;
-    const anchor = snap(tens[0].x(), tens[0].y()); for (let i=0;i<10;i++) tens[i].destroy(); createHundred(anchor.x, anchor.y); changed = true;
+    const anchor = snap(tens[0].x(), tens[0].y());
+    for (let i=0;i<10;i++) tens[i].destroy();
+    createHundred(anchor.x, anchor.y);
+    changed = true;
   }
   if (changed) { reorderHundredsZone(); pieceLayer.draw(); }
   return changed;
