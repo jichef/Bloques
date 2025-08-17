@@ -28,7 +28,7 @@ const WORLD_H = WORLD_ROWS * GRID;
 
 // ===== Zoom limits =====
 const SCALE_MIN = 0.4, SCALE_MAX = 3.0, SCALE_BY = 1.06;
-
+const INITIAL_ZOOM = 1.3; // entre SCALE_MIN y SCALE_MAX, ajusta al gusto
 // ----- Stage y Layers -----
 const stage = new Konva.Stage({
   container: "container",
@@ -507,8 +507,8 @@ window.addEventListener("resize", relayout);
 drawGrid();
 computeZones();
 drawZones();
-centerZones();            // ← centrado inicial
-applyWorldTransform();
+centerZones();                       // zonas en el centro
+zoomAt({ x: stage.width()/2, y: stage.height()/2 }, INITIAL_ZOOM); // ← zoom-in inicial
 wireUI();
 updateStatus();
 pieceLayer.draw();
