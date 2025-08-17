@@ -50,7 +50,50 @@ function applyWorldTransform() {
   });
   stage.batchDraw();
 }
+// === Conversión pantalla ⇄ mundo (con tu pan/zoom)
+function screenToWorld(pt){
+  return {
+    x: (pt.x - world.x) / world.scale,
+    y: (pt.y - world.y) / world.scale
+  };
+}
 
+// Rectángulo visible actual en coordenadas del mundo
+function visibleWorldRect(){
+  const tl = screenToWorld({ x: 0, y: 0 });
+  const br = screenToWorld({ x: stage.width(), y: stage.height() });
+  return { x: tl.x, y: tl.y, w: br.x - tl.x, h: br.y - tl.y };
+}
+
+// Centrar en la zona visible (alineado a la rejilla)
+function visibleWorldCenter(){
+  const r = visibleWorldRect();
+  return { x: toCell(r.x + r.w/2), y: toCell(r.y + r.h/2) };
+}
+
+// Asegura que una ficha de tamaño (w,h) cabe dentro de lo visible
+function clampToVisible(x, y, w, h){
+  const r = visibleWorldRect();
+  const CX = Math.min(Math.max(x, r.x), r.x + r.w - w);
+  const CY = Math.min(Math.max(y, r.y), r.y + r.h - h);
+  return snap(CX, CY);
+}
+
+// Posiciones “seguras” para cada tipo de ficha, dentro de lo visible
+function spawnPosUnit(){
+  const c = visibleWorldCenter();
+  return clampToVisible(c.x, c.y, GRID, GRID);
+}
+function spawnPosTen(){
+  const c = visibleWorldCenter();
+  // la decena mide 10×1 celdas
+  return clampToVisible(c.x - 5*GRID, c.y, 10*GRID, GRID);
+}
+function spawnPosHundred(){
+  const c = visibleWorldCenter();
+  // la centena mide 10×10 celdas
+  return clampToVisible(c.x - 5*GRID, c.y - 5*GRID, 10*GRID, 10*GRID);
+}
 // Helpers de zoom
 function zoomAt(pointer, targetScale){
   const old = world.scale;
@@ -330,9 +373,9 @@ function checkBuildZones() {
 function wireUI(){
   const $ = id => document.getElementById(id);
 
-  $('btn-unit')   ?.addEventListener('click', ()=>{ const c=centerWorld(); createUnit(c.x,c.y); });
-  $('btn-ten')    ?.addEventListener('click', ()=>{ const c=centerWorld(); createTen(c.x-5*GRID,c.y); });
-  $('btn-hundred')?.addEventListener('click', ()=>{ const c=centerWorld(); createHundred(c.x-5*GRID,c.y-5*GRID); });
+  $('btn-unit')   ?.addEventListener('click', ()=>{ const p = spawnPosUnit();    createUnit(p.x, p.y); });
+$('btn-ten')    ?.addEventListener('click', ()=>{ const p = spawnPosTen();     createTen(p.x, p.y); });
+$('btn-hundred')?.addEventListener('click', ()=>{ const p = spawnPosHundred(); createHundred(p.x, p.y); });
   $('btn-clear')  ?.addEventListener('click', ()=>{ pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); });
   $('btn-compose')?.addEventListener('click', ()=>{ checkBuildZones(); });
   $('btn-say')    ?.addEventListener('click', ()=>{
