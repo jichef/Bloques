@@ -149,7 +149,10 @@ function overlapsAnyBox(box, skipId=null){
   for (let i=0;i<arr.length;i++){ const g=arr[i]; if (skipId && g._id===skipId) continue; if (rectsIntersect(box, boxForGroup(g))) return true; }
   return false;
 }
-
+function setMiniStatus(texto){
+  const el = document.getElementById('mini-status');
+  if (el) el.textContent = texto || '';
+}
 // ====== TACHADO ======
 function isStriked(g){ return !!g.getAttr('striked'); }
 function updateStrikeVisual(g){
@@ -299,6 +302,9 @@ function updateStatus(){
         <div class="label">Total</div><div class="value">${total}</div>
         <div class="label">En letras</div><div class="value">${enLetras}</div>`;
     }
+    // ✅ mini‑resumen en la barra superior
+    setMiniStatus(`Total: ${total}  |  ${hundreds}c  ${tens}d  ${units}u  (${enLetras})`);
+
     if(challengeNumber!==null && total===challengeNumber){
       const ch=document.getElementById('challenge'); const msg=`🎉 ¡Correcto! Has formado ${enLetras}`;
       if(ch) ch.textContent=msg; speak(msg); challengeNumber=null;
@@ -321,6 +327,13 @@ function updateStatus(){
       <div class="label">Resultado</div><div class="value">${r.total}</div>
     `;
   }
+  // ✅ mini‑resumen en la barra superior
+  setMiniStatus(
+    `A=${a.total}  B=${b.total}  R=${r.total}  |  ` +
+    `A: ${a.hundreds}c-${a.tens}d-${a.units}u · ` +
+    `B: ${b.hundreds}c-${b.tens}d-${b.units}u`
+  );
+
   const ch = document.getElementById('challenge');
   if (ch){
     if (r.total === a.total + b.total && (a.total>0 || b.total>0)){
@@ -330,7 +343,6 @@ function updateStatus(){
     }
   }
 }
-
 // ===== Reordenaciones construcción =====
 function centerInRectBox(b, z){ const cx=b.x+b.w/2, cy=b.y+b.h/2; return (cx>=z.x && cx<=z.x+z.w && cy>=z.y && cy<=z.y+z.h); }
 function reorderTensZone(){
