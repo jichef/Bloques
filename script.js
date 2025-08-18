@@ -258,30 +258,32 @@ function attachStrikeHandlers(g){
   g.on('dragend', ()=>{ if (isStriked(g)) updateStrikeVisual(g); });
 }
 // ——— Forzar listeners del panel (idempotente) ———
-function ensurePanelListeners(){
-  const panel = document.getElementById('panel');
-  const btn   = document.getElementById('panel-toggle');
-  const strip = document.getElementById('details-strip');
-
+function ensurePanelListeners() {
+  const panel  = document.getElementById('panel');
+  const strip  = document.getElementById('details-strip');
+  const caret  = document.getElementById('details-caret');
+  const btn    = document.getElementById('panel-toggle');
   if (!panel) return;
 
-  const handler = () => togglePanel();
+  function togglePanel() {
+    const open = panel.classList.toggle('open');
 
-  // Clona/reemplaza para evitar listeners duplicados
-  if (btn){
-    const newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
-    newBtn.addEventListener('click', handler);
+    // sincroniza la flecha en la franja
+    if (caret) caret.textContent = open ? '⬇︎' : '⬆︎';
+
+    // sincroniza el texto del botón
+    if (btn) {
+      btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
+      btn.setAttribute('aria-expanded', String(open));
+    }
+
+    // accesibilidad para el panel
+    panel.setAttribute('aria-hidden', String(!open));
   }
 
-  if (strip){
-    const newStrip = strip.cloneNode(true);
-    strip.parentNode.replaceChild(newStrip, strip);
-    newStrip.addEventListener('click', handler);
-  }
-
-  // Sincroniza caret/aria al cargar
-  if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
+  // 👇 aquí conectas los dos triggers
+  strip?.addEventListener('click', togglePanel);
+  btn?.addEventListener('click', togglePanel);
 }
 // ===== SPAWN visible sin solapes =====
 const SPAWN = { baseX:0, baseY:0, curX:0, curY:0, rowH:GRID*2, band:{x:0,y:0,w:0,h:0} };
