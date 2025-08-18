@@ -164,6 +164,20 @@ function updateStrikeVisual(g){
   g.add(l1,l2);
   g.draw();
 }
+
+function setDetailsStrip(texto){
+  const el = document.getElementById('details-text');
+  if (el) el.textContent = texto || 'Detalles…';
+}
+function syncDetailsStripWithPanel(){
+  const strip = document.getElementById('details-strip');
+  const panel = document.getElementById('panel');
+  const caret = document.getElementById('details-caret');
+  if (!strip || !panel || !caret) return;
+  const open = panel.classList.contains('open');
+  strip.setAttribute('aria-expanded', String(open));
+  caret.textContent = open ? '⬇︎' : '⬆︎';
+}
 function setStriked(g, val){ g.setAttr('striked', val?1:0); updateStrikeVisual(g); updateStatus(); }
 function toggleStrike(g){ setStriked(g, !isStriked(g)); }
 function attachStrikeHandlers(g){
@@ -862,7 +876,18 @@ function wireUI(){
       stage.batchDraw();
     }
   });
-
+document.getElementById('details-strip')?.addEventListener('click', ()=>{
+  const panel = document.getElementById('panel');
+  const btn   = document.getElementById('panel-toggle');
+  if (!panel) return;
+  const open = panel.classList.toggle('open');
+  if (btn){
+    btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
+    btn.setAttribute('aria-expanded', String(open));
+  }
+  panel.setAttribute('aria-hidden', String(!open));
+  syncDetailsStripWithPanel();
+});
   // Estado visual inicial
   setUIForMode();
 }
