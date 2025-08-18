@@ -1017,7 +1017,7 @@ function wireUI(){
   // Asegura mini‑resumen y espaciado correcto en la topbar
   ensureMiniStatus();
 
-  // Delegación de eventos para TODOS los botones dentro de #controls
+  // --- Delegación primaria: SOLO botones dentro de #controls
   controls.addEventListener('click', (e)=>{
     const btn = e.target.closest('button');
     if (!btn || !controls.contains(btn)) return;
@@ -1052,12 +1052,45 @@ function wireUI(){
 
       case 'btn-zoom-in':  zoomStep(+1); break;
       case 'btn-zoom-out': zoomStep(-1); break;
-case 'btn-sumdiff-basico':   setSumDifficulty('basico');   break;
-case 'btn-sumdiff-avanzado': setSumDifficulty('avanzado'); break;
-case 'btn-sumdiff-experto':  setSumDifficulty('experto');  break;
-case 'btn-diff-inicial':  setDifficulty('inicial');  break;
-case 'btn-diff-medio':    setDifficulty('medio');    break;
-case 'btn-diff-avanzado': setDifficulty('avanzado'); break;
+
+      // ===== Dificultad SUMAS/RESTAS =====
+      case 'btn-sumdiff-basico':
+        setSumDifficulty('basico');
+        renderSumDifficultyUI();
+        if (modo==='sumas'){ computeZonesSumas(); drawZonesSumas(); resetSpawnBase(); updateStatus(); }
+        break;
+
+      case 'btn-sumdiff-avanzado':
+        setSumDifficulty('avanzado');
+        renderSumDifficultyUI();
+        if (modo==='sumas'){ computeZonesSumas(); drawZonesSumas(); resetSpawnBase(); updateStatus(); }
+        break;
+
+      case 'btn-sumdiff-experto':
+        setSumDifficulty('experto');
+        renderSumDifficultyUI();
+        if (modo==='sumas'){ computeZonesSumas(); drawZonesSumas(); resetSpawnBase(); updateStatus(); }
+        break;
+
+      // ===== Dificultad CONSTRUCCIÓN (retos) =====
+      case 'btn-diff-inicial':
+        setDifficulty('inicial');
+        renderDifficultyUI();
+        if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); resetSpawnBase(); updateStatus(); }
+        break;
+
+      case 'btn-diff-medio':
+        setDifficulty('medio');
+        renderDifficultyUI();
+        if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); resetSpawnBase(); updateStatus(); }
+        break;
+
+      case 'btn-diff-avanzado':
+        setDifficulty('avanzado');
+        renderDifficultyUI();
+        if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); resetSpawnBase(); updateStatus(); }
+        break;
+
       case 'btn-reset-view':
         world.scale = 1;
         world.x = stage.width()/2  - WORLD_W/2;
@@ -1069,20 +1102,20 @@ case 'btn-diff-avanzado': setDifficulty('avanzado'); break;
         syncDetailsStripWithPanel();
         break;
 
-case 'btn-challenge': {
-  if (modo!=='construccion') return;
-  const max = DIFFICULTY_LEVELS[currentDifficulty] || 999;
-  const n = Math.floor(Math.random()*max) + 1;
-  challengeNumber = n;
+      case 'btn-challenge': {
+        if (modo!=='construccion') return;
+        const max = DIFFICULTY_LEVELS[currentDifficulty] || 999;
+        const n = Math.floor(Math.random()*max) + 1;
+        challengeNumber = n;
 
-  const ch = $('challenge');
-  if (ch){
-    const label = currentDifficulty[0].toUpperCase()+currentDifficulty.slice(1);
-    ch.textContent = `🎯 (${label}) Forma el número: ${n}`;
-  }
-  speak(`Forma el número ${numEnLetras(n)}`);
-  break;
-}
+        const ch = $('challenge');
+        if (ch){
+          const label = currentDifficulty[0].toUpperCase()+currentDifficulty.slice(1);
+          ch.textContent = `🎯 (${label}) Forma el número: ${n}`;
+        }
+        speak(`Forma el número ${numEnLetras(n)}`);
+        break;
+      }
 
       case 'btn-say': {
         const {units,tens,hundreds,total}=countAll();
@@ -1104,6 +1137,37 @@ case 'btn-challenge': {
         sizeStageToContainer();
         break;
       }
+
+      default:
+        // No-op
+        break;
+    }
+  });
+
+  // --- Respaldo opcional: si pusiste botones de dificultad FUERA de #controls
+  document.addEventListener('click', (e)=>{
+    const b = e.target.closest('button');
+    if (!b) return;
+    switch(b.id){
+      case 'btn-sumdiff-basico':
+      case 'btn-sumdiff-avanzado':
+      case 'btn-sumdiff-experto':
+        if (!controls.contains(b)) {
+          setSumDifficulty(b.id==='btn-sumdiff-basico'?'basico':b.id==='btn-sumdiff-avanzado'?'avanzado':'experto');
+          renderSumDifficultyUI();
+          if (modo==='sumas'){ computeZonesSumas(); drawZonesSumas(); resetSpawnBase(); updateStatus(); }
+        }
+        break;
+
+      case 'btn-diff-inicial':
+      case 'btn-diff-medio':
+      case 'btn-diff-avanzado':
+        if (!controls.contains(b)) {
+          setDifficulty(b.id==='btn-diff-inicial'?'inicial':b.id==='btn-diff-medio'?'medio':'avanzado');
+          renderDifficultyUI();
+          if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); resetSpawnBase(); updateStatus(); }
+        }
+        break;
     }
   });
 
@@ -1122,9 +1186,9 @@ case 'btn-challenge': {
 
   // Estado inicial coherente
   setUIForMode();
-  renderDifficultyUI();
-  renderSumDifficultyUI();
-  syncDetailsStripWithPanel();
+  renderDifficultyUI?.();
+  renderSumDifficultyUI?.();
+  syncDetailsStripWithPanel?.();
 }
 
 // Pan & zoom
