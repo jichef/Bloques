@@ -141,3 +141,27 @@ button { touch-action: manipulation; }
   /* si quisieras, puedes ajustar --strip-h aquí */
   /* :root { --strip-h: 50px; } */
 }
+/* Evita que el contenedor superior bloquee clics cuando el panel está cerrado */
+#panel-wrap {
+  pointer-events: none;
+}
+
+/* El panel cerrado no recibe eventos (ya lo tenías) */
+#panel {
+  pointer-events: none;
+}
+
+/* Cuando el panel está abierto, sí debe recibir eventos */
+#panel.open {
+  pointer-events: auto;
+}
+
+/* El botón interno siempre debe poder clicarse */
+#panel #panel-toggle {
+  pointer-events: auto;
+}
+
+/* (Opcional) por si hace falta en móviles */
+#details-strip {
+  touch-action: manipulation;
+}
