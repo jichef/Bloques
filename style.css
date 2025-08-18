@@ -1,14 +1,22 @@
 :root { --ui-bg: #ffffffcc; }
 * { box-sizing: border-box; }
+
 html, body { 
   margin:0; 
   height:100%; 
   background:#f9f9f9; 
   font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; 
 }
-#container { position:fixed; inset:0; }
 
-/* Fuente personalizada Escolar */
+/* ===== Canvas / contenedor =====
+   Reservamos 34px abajo para que la franja "Detalles" no tape el lienzo */
+#container { 
+  position:fixed; 
+  top:0; left:0; right:0; 
+  bottom:34px;            /* <- antes era inset:0; ahora guardamos sitio a la franja */
+}
+
+/* ===== Fuente personalizada Escolar ===== */
 @font-face {
   font-family: 'Escolar';
   src:
@@ -19,7 +27,7 @@ html, body {
   font-display: swap;
 }
 
-/* Franja superior */
+/* ===== Franja superior (estado grande) ===== */
 #status {
   font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   font-size: 20px;  
@@ -27,10 +35,10 @@ html, body {
   padding-top:2px;
 }
 
-/* Panel inferior (desplegable) */
+/* ===== Panel inferior (desplegable: contenido) ===== */
 #breakdown {
   font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  font-size: 26px;   /* más grande */
+  font-size: 26px;       /* más grande */
   line-height: 1.5;
   display:grid; 
   grid-template-columns:auto 1fr; 
@@ -39,25 +47,54 @@ html, body {
 #breakdown .label { color:#555; }
 #breakdown .value { font-weight:600; }
 
-/* Colores de C, D y U */
-#breakdown .value {
-  font-weight: 600;
-}
-#breakdown .value::first-letter {
-  font-weight: 700;
-}
-#breakdown .value:has(> span.c) .c { color:#2ecc71; }  /* Centenas (verde) */
-#breakdown .value:has(> span.d) .d { color:#ff3b30; }  /* Decenas (rojo) */
-#breakdown .value:has(> span.u) .u { color:#1f78ff; }  /* Unidades (azul) */
+/* ===== Colores de C, D y U (reutilizables) ===== */
+.c { color:#2ecc71; font-weight:700; }  /* Centenas (verde)  */
+.d { color:#ff3b30; font-weight:700; }  /* Decenas  (rojo)   */
+.u { color:#1f78ff; font-weight:700; }  /* Unidades (azul)   */
 
-/* Panel inferior contenedor */
-#panel { position:fixed; left:0; right:0; bottom:0; transform:translateY(calc(100% - 44px)); transition:transform .25s ease; z-index:11; }
-#panel.open { transform: translateY(0); }
-#panel-toggle { width:100%; height:44px; border:none; background:#34495e; color:#fff; font-size:16px; cursor:pointer; }
-#panel-content { background:#fff; border-top:1px solid #e5e5e5; padding:12px 14px 16px; max-height:40vh; overflow:auto; }
+/* ===== Franja inferior fija ("Detalles") ===== */
+#details-strip{
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: 34px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px;
+  background: rgba(255,255,255,0.96);
+  border-top: 1px solid #e5e5e5;
+  font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 18px;       /* tamaño cómodo para aula */
+  line-height: 1.3;
+  color: #1f2340;
+  z-index: 12;           /* por encima del canvas y debajo del panel */
+  cursor: pointer;
+  user-select: none;
+}
+#details-text{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
+#details-caret{ font-size: 12px; color: #636a8a; }
+
+/* ===== Contenedor del panel plegable ===== */
+#panel-wrap { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; }
+
+/* ===== Panel (plegable) =====
+   Posicionado encima de la franja; comienza “cerrado” mostrando sólo la franja */
+#panel { 
+  max-height: 40vh; 
+  overflow: auto; 
+  background: rgba(255,255,255,0.96);
+  border-top: 1px solid #e5e5e5;
+  padding: 10px 14px;
+  transform: translateY(calc(100% - 34px));  /* deja visible la franja */
+  transition: transform .25s ease;
+  pointer-events: none;                      /* deshabilita interacciones si está cerrado */
+}
+#panel.open {
+  transform: translateY(0%);                 /* abre el panel por completo */
+  pointer-events: auto;
+}
 #panel h3, #panel h4 { margin:8px 0; }
+#panel #panel-toggle { pointer-events: auto; }
 
-/* Botones superiores */
+/* ===== Botones superiores ===== */
 #controls {
   position: fixed;
   top: env(safe-area-inset-top, 8px);
@@ -74,28 +111,3 @@ html, body {
 
 /* iOS: evitar zoom extraño al tocar botones */
 button { touch-action: manipulation; }
-/* Tamaños: status + panel inferior (breakdown) + franja inferior */
-#status {
-  font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  font-size: 20px;
-  line-height: 1.3;
-  padding-top: 2px;
-}
-#breakdown {
-  font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  font-size: 26px;     /* grande */
-  line-height: 1.5;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px 12px;
-}
-#details-strip {
-  font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  font-size: 18px;     /* sube tamaño de la franja */
-  line-height: 1.3;
-}
-
-/* Colores de C, D y U — reutilizables en cualquier parte */
-.c { color:#2ecc71; font-weight:700; } /* Centenas (verde)  */
-.d { color:#ff3b30; font-weight:700; } /* Decenas  (rojo)   */
-.u { color:#1f78ff; font-weight:700; } /* Unidades (azul)   */
