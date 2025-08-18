@@ -69,8 +69,6 @@ function drawGrid(){
   gridLayer.draw();
 }
 
-// ===== Modos =====
-let modo = "construccion"; // "construccion" | "sumas"
 
 // ===== Zonas ancladas al VIEWPORT =====
 let ZONES = null;
