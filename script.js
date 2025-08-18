@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v17.1.0: Construcción + Sumas, zonas ancladas al viewport, SPAWN visible sin solapes, TACHADO) =====
-console.log("Bloques v17.1.0");
+// ===== Bloques — script.js (v17.1.0: Construcción + Sumas, zonas ancladas al viewport, SPAWN visible sin solapes, TACHADO + Corrección + Toggle Topbar) =====
+console.log("Bloques v17.1.0 + corrección + toggle topbar");
 
 Konva.pixelRatio = 1;
 
@@ -22,8 +22,8 @@ const SCALE_MIN = 0.4, SCALE_MAX = 3.0, SCALE_BY = 1.06;
 // Stage + layers
 const stage = new Konva.Stage({ container:"container", width:innerWidth, height:innerHeight });
 const gridLayer  = new Konva.Layer({ listening:false });
-const uiLayer    = new Konva.Layer({ listening:false });
-const pieceLayer = new Konva.Layer();
+const uiLayer    = new Konva.Layer({ listening:false });    // etiquetas/zonas/halos
+const pieceLayer = new Konva.Layer();                       // piezas
 stage.add(gridLayer, uiLayer, pieceLayer);
 
 // Transform global
@@ -73,8 +73,8 @@ function drawGrid(){
 // ===== Zonas ancladas al VIEWPORT =====
 let ZONES = null;
 let zoneTenRect=null, zoneHundRect=null; // construcción
-let zoneA=null, zoneB=null, zoneR=null;  // sumas
-let zoneARect=null, zoneBRect=null, zoneRRect=null;
+let zoneA=null, zoneB=null, zoneR=null;  // sumas (objetos rectángulo)
+let zoneARect=null, zoneBRect=null, zoneRRect=null; // Konva.Rect visibles
 
 const VIEW_M = GRID*3; // margen izq
 const VIEW_T = GRID*3; // margen top
@@ -126,13 +126,13 @@ function computeZonesSumas(){
 function drawZonesSumas(){
   uiLayer.destroyChildren();
 
-  zoneARect = new Konva.Rect({ x:zoneA.x, y:zoneA.y, width:zoneA.w, height:zoneA.h, stroke:ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill:ZONE_FILL });
+  zoneARect = new Konva.Rect({ x:zoneA.x, y:zoneA.y, width:zoneA.w, height:zoneA.h, stroke:ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill:ZONE_FILL, name:'zonaA' });
   const aLbl = new Konva.Text({ x:zoneA.x+6, y:zoneA.y-22, text:zoneA.label, fontSize:16, fill: ZONE_STROKE });
 
-  zoneBRect = new Konva.Rect({ x:zoneB.x, y:zoneB.y, width:zoneB.w, height:zoneB.h, stroke:ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill:ZONE_FILL });
+  zoneBRect = new Konva.Rect({ x:zoneB.x, y:zoneB.y, width:zoneB.w, height:zoneB.h, stroke:ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill:ZONE_FILL, name:'zonaB' });
   const bLbl = new Konva.Text({ x:zoneB.x+6, y:zoneB.y-22, text:zoneB.label, fontSize:16, fill: ZONE_STROKE });
 
-  zoneRRect = new Konva.Rect({ x:zoneR.x, y:zoneR.y, width:zoneR.w, height:zoneR.h, stroke:ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill:ZONE_FILL });
+  zoneRRect = new Konva.Rect({ x:zoneR.x, y:zoneR.y, width:zoneR.w, height:zoneR.h, stroke:ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill:ZONE_FILL, name:'zonaR' });
   const rLbl = new Konva.Text({ x:zoneR.x+6, y:zoneR.y-22, text:zoneR.label, fontSize:16, fill: ZONE_STROKE });
 
   uiLayer.add(zoneARect, aLbl, zoneBRect, bLbl, zoneRRect, rLbl);
@@ -152,7 +152,6 @@ function overlapsAnyBox(box, skipId=null){
 
 // ====== TACHADO ======
 function isStriked(g){ return !!g.getAttr('striked'); }
-
 function updateStrikeVisual(g){
   g.find('.strike').forEach(n=>n.destroy());
   if (!isStriked(g)) { g.draw(); return; }
@@ -164,22 +163,18 @@ function updateStrikeVisual(g){
 }
 function setStriked(g, val){ g.setAttr('striked', val?1:0); updateStrikeVisual(g); updateStatus(); }
 function toggleStrike(g){ setStriked(g, !isStriked(g)); }
-
 function attachStrikeHandlers(g){
-  // Ctrl / Cmd / Alt + clic → tachar
   g.on('click', (e)=>{
     if (e.evt && (e.evt.ctrlKey || e.evt.metaKey || e.evt.altKey)){
       toggleStrike(g);
       e.cancelBubble = true;
     }
   });
-  // Clic derecho → tachar
   g.on('contextmenu', (e)=>{
     e.evt.preventDefault();
     toggleStrike(g);
     e.cancelBubble = true;
   });
-  // Recoloca la X si se movió
   g.on('dragend', ()=>{ if (isStriked(g)) updateStrikeVisual(g); });
 }
 
@@ -190,7 +185,6 @@ function computeSpawnBandInView(){
   const v = visibleWorldRect();
   const pad=GRID, gap=GRID*3;
 
-  // referencia según modo
   let ref = null;
   if (modo === 'construccion' && ZONES?.hund) ref = ZONES.hund;
   if (modo === 'sumas' && ZONES?.R)          ref = ZONES.R;
@@ -213,7 +207,6 @@ function computeSpawnBandInView(){
   const left = clampBand(v.x+pad, ref.y+pad, (ref.x-gap)-(v.x+pad), Math.min(ref.h-2*pad, v.h-2*pad));
   if (ok(left)) return left;
 
-  // Fallback: esquina sup-dcha del viewport
   const fbW = Math.max(GRID*12, Math.min(v.w-2*pad, GRID*20));
   const fbH = Math.max(GRID*6,  Math.min(v.h-2*pad, GRID*10));
   return { x: toCell(v.x+v.w-fbW-pad), y: toCell(v.y+pad), w: fbW, h: fbH };
@@ -341,7 +334,7 @@ function updateStatus(){
 // ===== Reordenaciones construcción =====
 function centerInRectBox(b, z){ const cx=b.x+b.w/2, cy=b.y+b.h/2; return (cx>=z.x && cx<=z.x+z.w && cy>=z.y && cy<=z.y+z.h); }
 function reorderTensZone(){
-  if(!zoneTenRect) return;
+  if(!ZONES?.tens) return;
   const z=ZONES.tens, units=[];
   const arr=childrenGroups();
   for (let i=0;i<arr.length;i++){ const g=arr[i]; if (pieceType(g)==='unit' && !isStriked(g) && centerInRectBox(boxForGroup(g), ZONES.tens)) units.push(g); }
@@ -350,7 +343,7 @@ function reorderTensZone(){
   pieceLayer.batchDraw(); updateStatus();
 }
 function reorderHundredsZone(){
-  if(!zoneHundRect) return;
+  if(!ZONES?.hund) return;
   const z=ZONES.hund, tens=[], units=[];
   const arr=childrenGroups();
   for (let i=0;i<arr.length;i++){
@@ -388,7 +381,6 @@ function countInRect(zone){
 
 // ===== Eventos comunes =====
 function onDragEnd(group){
-  // (tachado se gestiona en attachStrikeHandlers)
   group.on('dragend', ()=>{
     group.position(snap(group.x(), group.y()));
     const type = pieceType(group);
@@ -425,7 +417,7 @@ function createTen(x,y){
   onDragEnd(g);
   attachStrikeHandlers(g);
   onDouble(g, ()=>{ 
-    if (isStriked(g)) return; // no descomponer si está tachada
+    if (isStriked(g)) return;
     const start=snap(g.x(),g.y()); 
     g.destroy(); 
     for(let k=0;k<10;k++) createUnit(start.x+k*GRID, start.y); 
@@ -453,7 +445,6 @@ function createHundred(x,y){
 function composeTensInZone(){
   if(modo!=='construccion' || !ZONES?.tens) return false;
   let changed=false;
-  // Buscar filas completas de 10 unidades contiguas dentro de la zona
   const rows=new Map();
   const arr=childrenGroups();
   for (let i=0;i<arr.length;i++){
@@ -475,7 +466,6 @@ function composeTensInZone(){
     }
   });
   if(!changed){
-    // fallback: 10 unidades cualesquiera dentro de la zona
     const pool=[];
     const arr2=childrenGroups();
     for (let i=0;i<arr2.length;i++){
@@ -492,7 +482,6 @@ function composeTensInZone(){
   if(changed){ reorderTensZone(); pieceLayer.draw(); }
   return changed;
 }
-
 function composeHundredsInZone(){
   if(modo!=='construccion' || !ZONES?.hund) return false;
   let changed=false;
@@ -532,9 +521,80 @@ function checkBuildZones(){
   reorderTensZone(); reorderHundredsZone(); updateStatus();
 }
 
+// ======== CORRECCIÓN DE SUMAS (C-D-U con acarreo) ========
+// Usamos directamente countInRect(zoneA/B/R)
+function normalizarCDU({c,d,u}){
+  let carryD = Math.floor(u/10); u = u%10; d += carryD;
+  let carryC = Math.floor(d/10); d = d%10; c += carryC;
+  return {c,d,u};
+}
+function comprobarSumaPasoAPaso(a,b,r){
+  // a/b/r son {hundreds, tens, units, total}
+  const aN = normalizarCDU({c:a.hundreds,d:a.tens,u:a.units});
+  const bN = normalizarCDU({c:b.hundreds,d:b.tens,u:b.units});
+  const rN = normalizarCDU({c:r.hundreds,d:r.tens,u:r.units});
+
+  const errores = [];
+
+  const sumaU = aN.u + bN.u;
+  const uEsperada = sumaU % 10;
+  const carryU = Math.floor(sumaU/10);
+  if (rN.u !== uEsperada) errores.push(`En unidades debería quedar ${uEsperada}, no ${rN.u}.`);
+
+  const sumaD = aN.d + bN.d + carryU;
+  const dEsperada = sumaD % 10;
+  const carryD = Math.floor(sumaD/10);
+  if (rN.d !== dEsperada) errores.push(`En decenas debería quedar ${dEsperada}, no ${rN.d}.`);
+
+  const cEsperada = aN.c + bN.c + carryD;
+  if (rN.c !== cEsperada) errores.push(`En centenas debería quedar ${cEsperada}, no ${rN.c}.`);
+
+  const okGlobal = (a.hundreds*100 + a.tens*10 + a.units) + (b.hundreds*100 + b.tens*10 + b.units)
+                 === (r.hundreds*100 + r.tens*10 + r.units);
+  if (!okGlobal && errores.length===0) errores.push('La suma total no coincide.');
+
+  return { correcto: errores.length===0, errores };
+}
+function mostrarErrores(lista){
+  const el = document.querySelector('#panel-correccion');
+  if (!el) return;
+  el.innerHTML = '';
+  if (lista.length===0){ el.innerHTML='<div class="ok">✅ ¡Correcto!</div>'; return; }
+  const ul=document.createElement('ul');
+  for (const msg of lista){ const li=document.createElement('li'); li.textContent=msg; ul.appendChild(li); }
+  el.appendChild(ul);
+}
+function resaltarZonaResultado(ok){
+  if (!zoneRRect) return;
+  // halo superpuesto (no interfiere)
+  let halo = uiLayer.findOne('.halo-correccion');
+  if (!halo){
+    halo = new Konva.Rect({
+      x: zoneRRect.x(), y: zoneRRect.y(),
+      width: zoneRRect.width(), height: zoneRRect.height(),
+      strokeWidth: 3, cornerRadius: 8, listening:false, name:'halo-correccion'
+    });
+    uiLayer.add(halo);
+  }
+  halo.stroke(ok ? '#2ecc71' : '#ff3b30');
+  halo.opacity(0.9);
+  halo.visible(true);
+  uiLayer.batchDraw();
+  setTimeout(()=>{ halo.visible(false); uiLayer.batchDraw(); }, 2200);
+}
+function corregirActual(){
+  if (modo!=='sumas'){ mostrarErrores(['Cambia a modo sumas para corregir.']); return false; }
+  const a = countInRect(zoneA);
+  const b = countInRect(zoneB);
+  const r = countInRect(zoneR);
+  const {correcto, errores} = comprobarSumaPasoAPaso(a,b,r);
+  resaltarZonaResultado(correcto);
+  mostrarErrores(errores);
+  return correcto;
+}
+
 // ====== Helpers UI de modo ======
 function setUIForMode(){
-  // Referencias de UI (IDs según tu HTML)
   const btnConstruccion = document.getElementById('btn-mode-construccion');
   const btnSumas        = document.getElementById('btn-mode-suma');
   const modeHint        = document.getElementById('mode-hint');
@@ -568,183 +628,7 @@ function setUIForMode(){
     drawZonesConstruccion();
     if (modeHint) modeHint.textContent = 'Modo construcción: crea y compón bloques libremente.';
   }
-// ===== Corrección de operaciones (sumas con C-D-U) =====
 
-// 1) Helpers: cuenta bloques por tipo en una zona/grupo Konva
-function contarBloquesEnGrupo(grupoKonva) {
-  // Ajusta estos nombres/clases según cómo crees las piezas
-  const isUnidad  = n => n.getAttr('tipo') === 'unidad';
-  const isDecena  = n => n.getAttr('tipo') === 'decena';
-  const isCentena = n => n.getAttr('tipo') === 'centena';
-
-  let u = 0, d = 0, c = 0;
-  grupoKonva.find(node => node.getAttr && node.getAttr('tipo')).each(node => {
-    if (isUnidad(node))  u += 1;
-    else if (isDecena(node))  d += 1;
-    else if (isCentena(node)) c += 1;
-  });
-
-  return { c, d, u };
-}
-
-// 2) Convierte C-D-U a número (100·c + 10·d + u)
-function cduANum({ c, d, u }) {
-  return (c * 100) + (d * 10) + u;
-}
-
-// 3) Normaliza por si el alumno formó una decena con 10 unidades, etc.
-function normalizarCDU({ c, d, u }) {
-  let carryD = Math.floor(u / 10);
-  u = u % 10;
-  d += carryD;
-
-  let carryC = Math.floor(d / 10);
-  d = d % 10;
-  c += carryC;
-  return { c, d, u };
-}
-
-// 4) Descompone un número a C-D-U
-function numACDU(n) {
-  n = Math.max(0, Math.floor(n));
-  const c = Math.floor(n / 100);
-  const d = Math.floor((n % 100) / 10);
-  const u = n % 10;
-  return { c, d, u };
-}
-
-// 5) Compara suma con acarreo columna a columna (explica fallos)
-function comprobarSumaPasoAPaso(aCDU, bCDU, rCDU) {
-  const errores = [];
-  // Copias para no mutar
-  let a = { ...aCDU }, b = { ...bCDU }, r = { ...rCDU };
-
-  // Normaliza entradas (por si el niño dejó 13 unidades, etc.)
-  a = normalizarCDU(a);
-  b = normalizarCDU(b);
-  r = normalizarCDU(r);
-
-  // Unidades
-  const sumaU = a.u + b.u;
-  const uEsperada = sumaU % 10;
-  const carryU = Math.floor(sumaU / 10);
-  if (r.u !== uEsperada) {
-    errores.push(`En unidades debería quedar ${uEsperada}, no ${r.u}.`);
-  }
-
-  // Decenas (incluye acarreo de U)
-  const sumaD = a.d + b.d + carryU;
-  const dEsperada = sumaD % 10;
-  const carryD = Math.floor(sumaD / 10);
-  if (r.d !== dEsperada) {
-    errores.push(`En decenas debería quedar ${dEsperada}, no ${r.d}.`);
-  }
-
-  // Centenas (incluye acarreo de D)
-  const cEsperada = a.c + b.c + carryD;
-  if (r.c !== cEsperada) {
-    errores.push(`En centenas debería quedar ${cEsperada}, no ${r.c}.`);
-  }
-
-  // Verificación global como red de seguridad
-  const okGlobal = cduANum(a) + cduANum(b) === cduANum(r);
-  if (!okGlobal && errores.length === 0) {
-    errores.push(`La suma total no coincide (${cduANum(a)} + ${cduANum(b)} ≠ ${cduANum(r)}).`);
-  }
-
-  return { correcto: errores.length === 0, errores, esperado: { u: uEsperada, d: dEsperada, c: a.c + b.c + carryD } };
-}
-
-// 6) UI: pinta borde verde/rojo en una zona/grupo
-function resaltarGrupo(grupoKonva, ok) {
-  // Si usas un rect de fondo dentro del grupo con nombre 'halo', mejor apunta a él:
-  let halo = grupoKonva.findOne('.halo-correccion');
-  if (!halo) {
-    // Crea un halo discreto (no interfiere con drag)
-    const box = grupoKonva.getClientRect({ relativeTo: grupoKonva });
-    halo = new Konva.Rect({
-      x: box.x - grupoKonva.x(),
-      y: box.y - grupoKonva.y(),
-      width: box.width,
-      height: box.height,
-      listening: false,
-      strokeWidth: 3,
-      cornerRadius: 8,
-      name: 'halo-correccion'
-    });
-    grupoKonva.add(halo);
-    grupoKonva.moveToTop();
-  }
-  halo.stroke(ok ? '#2ecc71' : '#ff3b30');
-  halo.opacity(0.9);
-  halo.visible(true);
-  grupoKonva.getLayer().batchDraw();
-
-  // Quitar el halo pasado un rato
-  setTimeout(() => {
-    halo.visible(false);
-    grupoKonva.getLayer().batchDraw();
-  }, 2200);
-}
-
-// 7) Muestra lista de errores en un panel (ajusta el selector a tu HTML)
-function mostrarErrores(lista) {
-  const el = document.querySelector('#panel-correccion');
-  if (!el) return;
-  el.innerHTML = '';
-  if (lista.length === 0) {
-    el.innerHTML = '<div class="ok">✅ ¡Correcto!</div>';
-    return;
-  }
-  const ul = document.createElement('ul');
-  lista.forEach(msg => {
-    const li = document.createElement('li');
-    li.textContent = msg;
-    ul.appendChild(li);
-  });
-  el.appendChild(ul);
-}
-
-// 8) Punto de entrada de corrección.
-//    Pasa los grupos/zones donde el alumno coloca sumando A, sumando B y resultado R.
-function corregirSuma(grupoA, grupoB, grupoR) {
-  const a = contarBloquesEnGrupo(grupoA);
-  const b = contarBloquesEnGrupo(grupoB);
-  const r = contarBloquesEnGrupo(grupoR);
-
-  // Normaliza por si hay 10u=1d, 10d=1c
-  const aN = normalizarCDU(a);
-  const bN = normalizarCDU(b);
-  const rN = normalizarCDU(r);
-
-  const { correcto, errores } = comprobarSumaPasoAPaso(aN, bN, rN);
-
-  resaltarGrupo(grupoR, correcto);
-  mostrarErrores(errores);
-
-  return correcto;
-}
-
-// 9) (Opcional) Wire-up de un botón "Corregir"
-//    Cambia los selectores para localizar tus tres grupos.
-function instalarBotonCorregir() {
-  const btn = document.querySelector('#btn-corregir');
-  if (!btn) return;
-
-  // Ajusta a cómo tengas referenciados los grupos de sumandos y resultado:
-  // por ejemplo: stage.findOne('#grupoA')
-  const grupoA = window.ZONA_SUMANDO_A;  // <-- asigna cuando crees las zonas
-  const grupoB = window.ZONA_SUMANDO_B;
-  const grupoR = window.ZONA_RESULTADO;
-
-  btn.addEventListener('click', () => {
-    if (!grupoA || !grupoB || !grupoR) return mostrarErrores(['Falta configurar las zonas A, B o Resultado.']);
-    corregirSuma(grupoA, grupoB, grupoR);
-  });
-}
-
-// Llama a esto una vez tengas creadas las zonas/grupos:
-setTimeout(instalarBotonCorregir, 0);
   // Marcar pestañas activas
   btnConstruccion?.classList.toggle('active', !enSumas);
   btnSumas?.classList.toggle('active', enSumas);
@@ -764,9 +648,8 @@ function enterSumasMode(){ enterMode('sumas'); }
 
 // ====== Generadores de ejercicios ======
 function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
-
 function newSum(a=null, b=null){
-  if (modo!=='sumas') enterMode('sumas'); // asegura el modo y la UI
+  if (modo!=='sumas') enterMode('sumas');
   if (a===null) a = randInt(10, 99);
   if (b===null) b = randInt(10, 99);
 
@@ -784,7 +667,6 @@ function newSum(a=null, b=null){
   updateStatus();
   try{ speak(`Nueva suma: ${a} más ${b}`);}catch{}
 }
-
 function newSub(a=null, b=null){
   if (modo!=='sumas') enterMode('sumas');
   if (a===null) a = randInt(20, 99);
@@ -808,14 +690,11 @@ function newSub(a=null, b=null){
 
 // ====== Wire UI (delegación) ======
 function wireUI(){
-  // Evita menú contextual por defecto en el canvas para usar clic derecho como “tachar”
   document.getElementById('container')?.addEventListener('contextmenu', e=> e.preventDefault());
-
   const $ = id => document.getElementById(id);
   const controls = $('controls');
   if (!controls) { console.error('❌ #controls no encontrado'); return; }
 
-  // Delegación de eventos: un solo listener para TODOS los botones dentro de #controls
   controls.addEventListener('click', (e)=>{
     const btn = e.target.closest('button');
     if (!btn || !controls.contains(btn)) return;
@@ -838,11 +717,11 @@ function wireUI(){
       case 'btn-ten':     createTen();     break;
       case 'btn-hundred': createHundred(); break;
 
-      // Generadores (solo visibles en modo sumas por setUIForMode)
+      // Generadores (sólo visibles en modo sumas)
       case 'btn-new-sum': newSum(); break;
       case 'btn-new-sub': newSub(); break;
 
-      // Limpiar
+      // Limpiar todo
       case 'btn-clear':
         pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase();
         break;
@@ -860,28 +739,45 @@ function wireUI(){
         resetSpawnBase(); updateStatus();
         break;
 
-      // Reto clásico (se oculta en modo sumas por setUIForMode)
+      // Reto (modo construcción)
       case 'btn-challenge': {
-  if (modo!=='construccion') return;
-  challengeNumber = Math.floor(Math.random()*900)+1;
-  const ch = $('challenge');
-  if (ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
-  speak(`Forma el número ${numEnLetras(challengeNumber)}`);
-  break;
-}
+        if (modo!=='construccion') return;
+        challengeNumber = Math.floor(Math.random()*900)+1;
+        const ch = $('challenge');
+        if (ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
+        speak(`Forma el número ${numEnLetras(challengeNumber)}`);
+        break;
+      }
 
       // Voz
-      case 'btn-say':
-        {
-          const {units,tens,hundreds,total}=countAll();
-          if (total===0) return;
-          hablarDescompYLetras(hundreds,tens,units,total,1100);
-        }
+      case 'btn-say': {
+        const {units,tens,hundreds,total}=countAll();
+        if (total===0) return;
+        hablarDescompYLetras(hundreds,tens,units,total,1100);
         break;
+      }
+
+      // ✅ CORREGIR SUMA
+      case 'btn-corregir':
+        corregirActual();
+        break;
+
+      // ⬆️/⬇️ Ocultar barra superior
+      case 'btn-toggle-topbar': {
+        const bar = document.getElementById('topbar');
+        if (!bar) return;
+        const hidden = bar.style.display !== 'none';
+        bar.style.display = hidden ? 'none' : 'flex';
+        btn.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
+        // reajusta stage alto si dependes del alto del viewport
+        stage.height(innerHeight - (bar.style.display==='none' ? 0 : bar.offsetHeight||0));
+        stage.batchDraw();
+        break;
+      }
     }
   });
 
-  // Panel detalles (fuera de #controls)
+  // Panel detalles
   $('#panel-toggle')?.addEventListener('click', ()=>{
     const panel = $('#panel');
     const open  = panel.classList.toggle('open');
@@ -891,20 +787,31 @@ function wireUI(){
     panel.setAttribute('aria-hidden', String(!open));
   });
 
+  // Atajo teclado: T = toggle topbar (si existe)
+  window.addEventListener('keydown', (ev)=>{
+    if ((ev.key==='t' || ev.key==='T') && !ev.metaKey && !ev.ctrlKey && !ev.altKey){
+      const bar = document.getElementById('topbar');
+      const btn = document.getElementById('btn-toggle-topbar');
+      if (!bar) return;
+      const hidden = bar.style.display !== 'none';
+      bar.style.display = hidden ? 'none' : 'flex';
+      if (btn) btn.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
+      stage.height(innerHeight - (bar.style.display==='none' ? 0 : bar.offsetHeight||0));
+      stage.batchDraw();
+    }
+  });
+
   // Estado visual inicial
   setUIForMode();
 }
 
 // Pan & zoom
 let isPanning=false, lastPointerPos=null;
-
 stage.on('mousedown touchstart', (e)=>{
-  // activa pan si haces down sobre cualquier capa que no sea pieceLayer
   if (e.target && e.target.getLayer && e.target.getLayer() === pieceLayer) return;
   isPanning = true;
   lastPointerPos = stage.getPointerPosition();
 });
-
 stage.on('mousemove touchmove', ()=>{
   if(!isPanning) return;
   const pos = stage.getPointerPosition();
@@ -915,11 +822,9 @@ stage.on('mousemove touchmove', ()=>{
   world.y += dy;
   applyWorldTransform();
   lastPointerPos = pos;
-  resetSpawnBase(); // mantener SPAWN visible
+  resetSpawnBase();
 });
-
 stage.on('mouseup touchend', ()=>{ isPanning=false; lastPointerPos=null; });
-
 stage.on('wheel', (e)=>{
   e.evt.preventDefault();
   const old = world.scale;
@@ -933,7 +838,6 @@ stage.on('wheel', (e)=>{
   applyWorldTransform();
   resetSpawnBase();
 });
-
 stage.on('dblclick dbltap', ()=>{
   const p = stage.getPointerPosition();
   const old = world.scale;
