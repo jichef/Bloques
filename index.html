@@ -33,8 +33,9 @@
     button.active { border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108,92,231,0.15) inset; }
     #panel-correccion { margin-left: auto; font-size: 14px; color: var(--muted); }
     #panel-correccion .ok { color: #2ecc71; font-weight: 600; }
+    #mini-status { font-size: 14px; color:#1f2340; white-space: nowrap; }
 
-    /* Panel inferior de detalles */
+    /* Panel inferior plegable */
     #panel-wrap { position: fixed; left: 0; right: 0; bottom: 0; pointer-events: none; }
     #panel {
       max-height: 40vh; overflow: auto; background: rgba(255,255,255,0.96);
@@ -92,12 +93,15 @@
 
     <!-- Mensajes de corrección a la derecha -->
     <div id="panel-correccion" aria-live="polite"></div>
+
+    <!-- Mini‑resumen siempre visible -->
+    <div id="mini-status"></div>
   </div>
 
   <!-- Lienzo Konva -->
   <div id="container" aria-label="Área de trabajo"></div>
 
-  <!-- Panel inferior (estado y detalles) -->
+  <!-- Panel inferior (plegable) -->
   <div id="panel-wrap">
     <div id="panel" aria-hidden="true">
       <div id="panel-header">
@@ -119,12 +123,12 @@
   <script src="https://unpkg.com/konva@9/konva.min.js"></script>
   <script src="script.js"></script>
 
-  <!-- Tips de uso -->
+  <!-- Tips -->
   <script>
     console.log('Atajos:');
     console.log('- T: Ocultar/Mostrar barra superior');
-    console.log('- Doble clic/tap: descomponer decena en 10 unidades o centena en 10 decenas');
-    console.log('- Ctrl/Cmd/Alt + clic (o botón derecho): tachar/ destachar una pieza');
+    console.log('- Doble clic/tap: descomponer decena o centena');
+    console.log('- Ctrl/Cmd/Alt + clic o botón derecho: tachar/ destachar');
   </script>
 </body>
 </html>
