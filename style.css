@@ -137,3 +137,13 @@ button.active{ border-color:#6c5ce7; box-shadow:0 0 0 2px rgba(108,92,231,.15) i
   /* Si quieres, sube la franja en móviles: */
   /* :root{ --strip-h:50px; } */
 }
+
+
+/* Evita scroll/zoom iOS cuando se arrastra el lienzo */
+#container,
+#container canvas {
+  touch-action: none;              /* bloquea pan/zoom del navegador */
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: contain;    /* corta el bounce/pull-to-refresh alrededor */
+}
