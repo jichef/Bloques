@@ -190,7 +190,56 @@ function setMiniStatus(texto){
   if (el) el.textContent = texto || '';
 }
 
+function setPanelOpen(open){
+  const panel = document.getElementById('panel');
+  const btn   = document.getElementById('panel-toggle');
+  const strip = document.getElementById('details-strip');
+  const caret = document.getElementById('details-caret');
 
+  if (!panel) return;
+  panel.classList.toggle('open', !!open);
+
+  // ARIA + textos
+  if (btn){
+    btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
+    btn.setAttribute('aria-expanded', String(open));
+  }
+  if (strip) strip.setAttribute('aria-expanded', String(open));
+  if (caret) caret.textContent = open ? '⬇︎' : '⬆︎';
+
+  // Si reajustas el canvas según alto, llama a tu función
+  if (typeof sizeStageToContainer === 'function') sizeStageToContainer();
+}
+
+function initDetailsStripToggle(){
+  const strip = document.getElementById('details-strip');
+  if (!strip) return;
+
+  // Evitar listeners duplicados
+  const newStrip = strip.cloneNode(true);
+  strip.parentNode.replaceChild(newStrip, strip);
+
+  newStrip.setAttribute('role','button');
+  newStrip.setAttribute('tabindex','0');
+
+  // Clic en cualquier punto de la franja
+  newStrip.addEventListener('click', ()=>{
+    const panel = document.getElementById('panel');
+    const open = panel?.classList.contains('open');
+    setPanelOpen(!open);
+  });
+
+  // Teclado: Enter o Espacio
+  newStrip.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      newStrip.click();
+    }
+  });
+}
+
+// Llama a esto al arrancar (después de crear el DOM y el panel)
+initDetailsStripToggle();
 
 // ====== TACHADO ======
 function isStriked(g){ return !!g.getAttr('striked'); }
