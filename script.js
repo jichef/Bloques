@@ -211,35 +211,8 @@ function setPanelOpen(open){
   if (typeof sizeStageToContainer === 'function') sizeStageToContainer();
 }
 
-function initDetailsStripToggle(){
-  const strip = document.getElementById('details-strip');
-  if (!strip) return;
 
-  // Evitar listeners duplicados
-  const newStrip = strip.cloneNode(true);
-  strip.parentNode.replaceChild(newStrip, strip);
 
-  newStrip.setAttribute('role','button');
-  newStrip.setAttribute('tabindex','0');
-
-  // Clic en cualquier punto de la franja
-  newStrip.addEventListener('click', ()=>{
-    const panel = document.getElementById('panel');
-    const open = panel?.classList.contains('open');
-    setPanelOpen(!open);
-  });
-
-  // Teclado: Enter o Espacio
-  newStrip.addEventListener('keydown', (e)=>{
-    if (e.key === 'Enter' || e.key === ' '){
-      e.preventDefault();
-      newStrip.click();
-    }
-  });
-}
-
-// Llama a esto al arrancar (después de crear el DOM y el panel)
-initDetailsStripToggle();
 
 // ====== TACHADO ======
 function isStriked(g){ return !!g.getAttr('striked'); }
@@ -289,29 +262,25 @@ function ensurePanelListeners(){
   const panel = document.getElementById('panel');
   const btn   = document.getElementById('panel-toggle');
   const strip = document.getElementById('details-strip');
-  const caret = document.getElementById('details-caret');
+
   if (!panel) return;
 
-  // Estado inicial coherente (aria + caret)
-  const isOpen = panel.classList.contains('open');
-  panel.setAttribute('aria-hidden', String(!isOpen));
-  if (strip) strip.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-  if (caret) caret.textContent = isOpen ? '⬇︎' : '⬆︎';
+  const handler = () => togglePanel();
 
-  // ——— Elimina listeners previos clonando ———
+  // Clona/reemplaza para evitar listeners duplicados
   if (btn){
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
-    newBtn.addEventListener('click', ()=> togglePanel());
+    newBtn.addEventListener('click', handler);
   }
 
   if (strip){
     const newStrip = strip.cloneNode(true);
     strip.parentNode.replaceChild(newStrip, strip);
-    newStrip.addEventListener('click', ()=> togglePanel());
+    newStrip.addEventListener('click', handler);
   }
 
-  // Sincroniza por si alguna UI auxiliar lo necesita
+  // Sincroniza caret/aria al cargar
   if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
 }
 // ===== SPAWN visible sin solapes =====
@@ -1176,67 +1145,51 @@ function sizeStageToContainer(){
 }
 
 function relayout(){
-  sizeStageToContainer();     // <-- antes usabas innerHeight; ahora usamos el alto real del contenedor
+  sizeStageToContainer(); // usa el alto real del contenedor
   drawGrid();
-  if (modo==='construccion'){ 
-    computeZonesConstruccion(); 
-    drawZonesConstruccion(); 
-  } else { 
-    computeZonesSumas();       
-    drawZonesSumas();       
+
+  if (modo === 'construccion'){
+    computeZonesConstruccion();
+    drawZonesConstruccion();
+  } else {
+    computeZonesSumas();
+    drawZonesSumas();
   }
+
   applyWorldTransform();
   resetSpawnBase();
   pieceLayer.draw();
   updateStatus();
-  // Mantén la flecha de la franja en sync cuando cambie el layout
+
+  // Mantén caret/aria en sync
   if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
 }
-document.getElementById('panel-toggle')?.addEventListener('click', ()=> togglePanel());
-document.getElementById('details-strip')?.addEventListener('click', ()=> togglePanel());
-addEventListener('resize', relayout);
-// ==== Toggle del panel al pulsar en la franja inferior ====
-// ==== Toggle del panel al pulsar en la franja inferior ====
-{
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Listeners ÚNICOS para abrir/cerrar el panel
   const strip = document.getElementById('details-strip');
-  if (strip) {
-    strip.addEventListener('click', function () {
-      const panel = document.getElementById('panel');
-      const caret = document.getElementById('details-caret');
-      const btn   = document.getElementById('panel-toggle');
-      if (!panel) return;
+  const btn   = document.getElementById('panel-toggle');
 
-      const open = panel.classList.toggle('open');
+  strip?.addEventListener('click', () => togglePanel());
+  btn?.addEventListener('click',   () => togglePanel());
 
-      // Sincroniza caret + aria en la franja
-      this.setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (caret) caret.textContent = open ? '⬇︎' : '⬆︎';
+  // Resize
+  window.addEventListener('resize', relayout);
 
-      // Sincroniza el botón interno del panel
-      if (btn){
-        btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
-        btn.setAttribute('aria-expanded', String(open));
-      }
-      panel.setAttribute('aria-hidden', String(!open));
+  // ===== Boot =====
+  sizeStageToContainer();
+  drawGrid();
+  computeZonesConstruccion();   // arranca en construcción
+  drawZonesConstruccion();
+  applyWorldTransform();
+  resetSpawnBase();
 
-      // Ajustes visuales auxiliares
-      if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
-      if (typeof sizeStageToContainer === 'function')      sizeStageToContainer();
-    });
-  }
-}// ===== Boot =====
-sizeStageToContainer();        // <-- ajusta al alto del #container calculado por CSS
-drawGrid();
-computeZonesConstruccion();    // arranca en construcción
-drawZonesConstruccion();
-applyWorldTransform();
-resetSpawnBase();
+  ensureMiniStatus();           // mini‑resumen en topbar
+  wireUI();                     // listeners de controles
 
-ensureMiniStatus();            // mini‑resumen en topbar (y corrige el espaciado)
-wireUI();                      // listeners (incluye panel-toggle si usas mi wireUI actualizado)
+  if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
 
-if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
-
-updateStatus();
-pieceLayer.draw();
-startIntro();
+  updateStatus();
+  pieceLayer.draw();
+  startIntro();
+});
