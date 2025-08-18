@@ -1074,8 +1074,8 @@ function pickSubOperands(diff) {
   if (diff === 'facil') {
     let a, b, guard = 0;
     do {
-      a = randInt(10, 99);
-      b = randInt(10, a);
+      a = randInt(0, 9;
+      b = randInt(0, a);
       guard++;
     } while ((a % 10) < (b % 10) && guard < 200); // evita préstamo en U
     return [a, b];
