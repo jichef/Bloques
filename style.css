@@ -1,10 +1,10 @@
-/* === Tipografía escolar para números y descomposiciones === */
-@font-face {
-  font-family: 'EscolarG';
-  src: url('escolar_G.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
+/* === Tipografía escolar === */
+@font-face{
+  font-family:'EscolarG';
+  src:url('escolar_G.woff2') format('woff2');
+  font-weight:normal;
+  font-style:normal;
+  font-display:swap;
 }
 
 :root{
@@ -14,130 +14,126 @@
   --text:#1f2340;
   --muted:#636a8a;
   --btn:#ffffff;
-  --strip-h: 44px; /* Altura visible de la franja “Detalles” */
+  --strip-h:44px; /* altura de la franja inferior */
 }
 
-html, body {
-  height: 100%;
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+html,body{
+  height:100%;
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
 /* ===== Lienzo ===== */
-#container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: calc(var(--strip-h) + env(safe-area-inset-bottom, 0px));
+#container{
+  position:fixed;
+  top:0; left:0; right:0;
+  bottom:calc(var(--strip-h) + env(safe-area-inset-bottom,0px));
 }
 
-/* ===== Barra superior ===== */
-#topbar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--bar);
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-  z-index: 30;
+/* ===== Topbar ===== */
+#topbar{
+  position:relative;
+  display:flex; align-items:center; flex-wrap:wrap; gap:8px;
+  padding:8px 12px;
+  background:var(--bar);
+  border-bottom:1px solid var(--border);
+  z-index:30;
 }
-#controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-button {
-  appearance: none; border: 1px solid var(--border); background: var(--btn);
-  padding: 6px 10px; border-radius: 8px; font-size: 14px; cursor: pointer;
-  touch-action: manipulation;
+#controls{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+button{
+  appearance:none;
+  border:1px solid var(--border);
+  background:var(--btn);
+  padding:6px 10px;
+  border-radius:8px;
+  font-size:14px;
+  cursor:pointer;
+  touch-action:manipulation;
 }
-button:hover { filter: brightness(0.97); }
-button.active { border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108,92,231,0.15) inset; }
-#panel-correccion { margin-left: auto; font-size: 14px; color: var(--muted); }
-#panel-correccion .ok { color: #2ecc71; font-weight: 600; }
+button:hover{ filter:brightness(0.97); }
+button.active{ border-color:#6c5ce7; box-shadow:0 0 0 2px rgba(108,92,231,.15) inset; }
+#panel-correccion{ margin-left:auto; font-size:14px; color:var(--muted); }
+#panel-correccion .ok{ color:#2ecc71; font-weight:600; }
 
-#mini-status {
-  font-size: 14px;
-  color:#1f2340;
-  white-space: nowrap;
-  font-family: 'EscolarG', sans-serif;
+#mini-status{
+  font-size:14px; color:#1f2340; white-space:nowrap;
+  font-family:'EscolarG', sans-serif;
 }
 
-/* ===== Franja inferior fija: “Detalles” ===== */
+/* ===== Franja inferior fija ===== */
 #details-strip{
-  position: fixed;
-  left: 0; right: 0; bottom: 0;
-  height: calc(var(--strip-h) + env(safe-area-inset-bottom, 0px));
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 14px;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  background: rgba(255,255,255,0.96);
-  border-top: 1px solid var(--border);
-  font-size: 18px;
-  color: #1f2340;
-  z-index: 1000;
-  cursor: pointer;
-  user-select: none;
-  font-family: 'EscolarG', sans-serif;
-  touch-action: manipulation;
+  position:fixed;
+  left:0; right:0; bottom:0;
+  height:calc(var(--strip-h) + env(safe-area-inset-bottom,0px));
+  display:flex; align-items:center; gap:10px;
+  padding:0 14px;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  background:rgba(255,255,255,.96);
+  border-top:1px solid var(--border);
+  font-size:18px; color:#1f2340;
+  z-index:1000;                /* debajo del panel abierto */
+  cursor:pointer; user-select:none;
+  font-family:'EscolarG', sans-serif;
+  touch-action:manipulation;
 }
-#details-text{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
-#details-caret{ font-size: 14px; color: #636a8a; }
+#details-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
+#details-caret{ font-size:14px; color:#636a8a; }
 
 /* ===== Panel inferior (plegable) ===== */
-#panel-wrap{
-  position: fixed;
-  left: 0; right: 0; bottom: 0;
-  z-index: 1100;
-  pointer-events: none; /* no bloquea clics si está cerrado */
-}
-#panel{
-  background: rgba(255,255,255,0.97);
-  border-top: 1px solid var(--border);
-  padding: 10px 14px;
-  min-height: var(--strip-h);
-  max-height: 85vh;              /* más alto para que no corte el “Total” */
-  overflow: auto;
-  transform: translateY(calc(100% - var(--strip-h)));
-  transition: transform 0.28s ease;
-  will-change: transform;
-  pointer-events: none;
-  font-size: 18px;
-}
-#panel #panel-toggle{ pointer-events: auto; }
-#panel.open{
-  transform: translateY(0);
-  pointer-events: auto;
-}
-#panel-header { display: flex; align-items: center; gap: 10px; }
-#panel-toggle { margin-left: auto; }
+/* Lo hacemos FIXED para que la animación sea robusta y lo sacamos 100% al cerrar */
+#panel-wrap{ display:contents; } /* wrapper neutral */
 
-/* ===== Textos con tipografía EscolarG ===== */
-#status {
-  font-weight: 600;
-  font-family: 'EscolarG', sans-serif;
-  font-size: 22px;
+#panel{
+  position:fixed;
+  left:0; right:0; bottom:0;
+  background:rgba(255,255,255,.97);
+  border-top:1px solid var(--border);
+  padding:10px 14px;
+  min-height:var(--strip-h);
+  max-height:85vh;              /* más alto para que no corte el “Total” */
+  overflow:auto;
+  transform:translateY(100%);   /* 🔒 cerrado: completamente fuera de pantalla */
+  transition:transform .28s ease;
+  will-change:transform;
+  pointer-events:none;          /* no captura clics estando cerrado */
+  font-size:18px;
+  z-index:1100;                 /* por encima de la franja al abrir */
 }
-#breakdown {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 4px 12px;
-  margin-top: 8px;
-  font-family: 'EscolarG', sans-serif;
-  font-size: 18px;
+#panel.open{
+  transform:translateY(0);      /* 🔓 abierto */
+  pointer-events:auto;
 }
-#mode-hint, #sum-info, #challenge { 
-  color: var(--muted); 
-  font-family: 'EscolarG', sans-serif; 
+#panel-header{ display:flex; align-items:center; gap:10px; }
+#panel-toggle{ margin-left:auto; pointer-events:auto; }
+
+/* ===== Tipografía escolar en textos clave ===== */
+#status{
+  font-weight:600;
+  font-family:'EscolarG', sans-serif;
+  font-size:22px;
+}
+#breakdown{
+  display:grid;
+  grid-template-columns:140px 1fr;
+  gap:4px 12px;
+  margin-top:8px;
+  font-family:'EscolarG', sans-serif;
+  font-size:18px;
+}
+#mode-hint, #sum-info, #challenge{
+  color:var(--muted);
+  font-family:'EscolarG', sans-serif;
 }
 
 /* ===== Colores C, D, U ===== */
-.c { color:#2ecc71; font-weight:700; } /* centenas (verde) */
-.d { color:#ff3b30; font-weight:700; } /* decenas  (rojo)  */
-.u { color:#1f78ff; font-weight:700; } /* unidades (azul)  */
+.c{ color:#2ecc71; font-weight:700; }
+.d{ color:#ff3b30; font-weight:700; }
+.u{ color:#1f78ff; font-weight:700; }
 
-/* Ajuste móvil */
-@media (max-width: 720px){
-  /* :root { --strip-h: 50px; } */
+/* ===== Móvil ===== */
+@media (max-width:720px){
+  /* Si quieres, sube la franja en móviles: */
+  /* :root{ --strip-h:50px; } */
 }
