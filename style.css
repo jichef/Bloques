@@ -27,7 +27,7 @@ html, body {
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
-/* ===== Lienzo: reserva espacio para la franja inferior + área segura ===== */
+/* ===== Lienzo ===== */
 #container {
   position: fixed;
   top: 0;
@@ -62,59 +62,56 @@ button.active { border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108,92,231,0.1
   font-size: 14px;
   color:#1f2340;
   white-space: nowrap;
-  font-family: 'EscolarG', sans-serif; /* fuente escolar */
+  font-family: 'EscolarG', sans-serif;
 }
 
 /* ===== Franja inferior fija: “Detalles” ===== */
 #details-strip{
   position: fixed;
   left: 0; right: 0;
-  bottom: 2px; /* subida ligera */
+  bottom: 2px;
   height: calc(var(--strip-h) + env(safe-area-inset-bottom, 0px));
   display: flex; align-items: center; gap: 10px;
   padding: 0 14px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: rgba(255,255,255,0.96);
   border-top: 1px solid var(--border);
-  font-size: 20px; /* más grande */
+  font-size: 20px;
   color: #1f2340;
-  z-index: 100; /* 👈 más alto que el panel */
+  z-index: 1000;              /* 👈 alto para no quedar tapado */
+  pointer-events: auto;       /* 👈 siempre clicable */
   cursor: pointer;
   user-select: none;
-
-  /* 👇 fuerza tipografía Escolar */
   font-family: 'Escolar', 'EscolarG', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 #details-text{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
 #details-caret{ font-size: 14px; color: #636a8a; }
 
 /* ===== Panel inferior (plegable) ===== */
-#panel-wrap { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; }
+#panel-wrap { position: fixed; left: 0; right: 0; bottom: 0; z-index: 900; }
 #panel {
   max-height: 40vh;
   overflow: auto;
   background: rgba(255,255,255,0.96);
   border-top: 1px solid var(--border);
   padding: 10px 14px;
-  padding-bottom: calc(10px + var(--strip-h) + env(safe-area-inset-bottom, 0px)); /* 👈 deja hueco para strip */
   transform: translateY(calc(100% - var(--strip-h)));
   transition: transform .25s ease;
-  pointer-events: none;
-  font-size: 18px; /* más grande */
+  pointer-events: none; /* cerrado: no recibe clics */
+  font-size: 18px;
 }
-#panel #panel-toggle { pointer-events: auto; }
 #panel.open {
   transform: translateY(0%);
-  pointer-events: auto;
+  pointer-events: auto; /* abierto: sí recibe clics */
 }
 #panel-header { display: flex; align-items: center; gap: 10px; }
-#panel-toggle { margin-left: auto; }
+#panel-toggle { margin-left: auto; pointer-events: auto; }
 
 /* ===== Textos con tipografía EscolarG ===== */
 #status {
   font-weight: 600;
   font-family: 'EscolarG', sans-serif;
-  font-size: 22px; /* más grande */
+  font-size: 22px;
 }
 #breakdown {
   display: grid;
@@ -122,7 +119,7 @@ button.active { border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108,92,231,0.1
   gap: 4px 12px;
   margin-top: 8px;
   font-family: 'EscolarG', sans-serif;
-  font-size: 18px; /* más grande */
+  font-size: 18px;
 }
 #mode-hint, #sum-info, #challenge { 
   color: var(--muted); 
@@ -130,30 +127,19 @@ button.active { border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108,92,231,0.1
 }
 
 /* ===== Colores C, D, U ===== */
-.c { color:#2ecc71; font-weight:700; } /* centenas (verde) */
-.d { color:#ff3b30; font-weight:700; } /* decenas  (rojo)  */
-.u { color:#1f78ff; font-weight:700; } /* unidades (azul)  */
+.c { color:#2ecc71; font-weight:700; }
+.d { color:#ff3b30; font-weight:700; }
+.u { color:#1f78ff; font-weight:700; }
 
 /* iOS: evitar zoom extraño al tocar botones */
 button { touch-action: manipulation; }
 
-/* Ajuste móvil: topbar algo más alta => contenedor deja hueco suficiente */
+/* Ajuste móvil */
 @media (max-width: 720px){
-  /* si quisieras, puedes ajustar --strip-h aquí */
-  /* :root { --strip-h: 50px; } */
+  /* se podría ajustar --strip-h aquí */
 }
 
-/* Evita que el contenedor superior bloquee clics cuando el panel está cerrado */
-#panel-wrap { pointer-events: none; }
-
-/* El panel cerrado no recibe eventos (ya lo tenías) */
-#panel { pointer-events: none; }
-
-/* Cuando el panel está abierto, sí debe recibir eventos */
-#panel.open { pointer-events: auto; }
-
-/* El botón interno siempre debe poder clicarse */
-#panel #panel-toggle { pointer-events: auto; }
-
-/* (Opcional) por si hace falta en móviles */
-#details-strip { touch-action: manipulation; }
+/* Garantizar que la franja siempre responde */
+#details-strip {
+  touch-action: manipulation;
+}
