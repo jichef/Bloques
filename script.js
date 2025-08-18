@@ -374,33 +374,44 @@ function hablarDescompYLetras(h,t,u,total,pausa=1000){
 }
 
 let challengeNumber=null;
+// Reemplaza COMPLETA tu updateStatus() por esta
 function updateStatus(){
   if (modo === 'construccion'){
     const {units,tens,hundreds,total}=countAll();
     const enLetras=numEnLetras(total);
 
+    // ---- Estado superior
     const st=document.getElementById('status');
-    if(st) st.textContent=`Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades — (${enLetras})`;
+    if(st){
+      st.innerHTML =
+        `Total: ${total} — ` +
+        `<span class="c">${hundreds}</span> centenas, ` +
+        `<span class="d">${tens}</span> decenas, ` +
+        `<span class="u">${units}</span> unidades — (${enLetras})`;
+    }
 
+    // ---- Panel inferior (desglose)
     const b=document.getElementById('breakdown');
     if(b){
       b.innerHTML = `
-        <div class="label">Centenas</div><div class="value">${hundreds} × 100 = ${hundreds*100}</div>
-        <div class="label">Decenas</div><div class="value">${tens} × 10 = ${tens*10}</div>
-        <div class="label">Unidades</div><div class="value">${units} × 1 = ${units}</div>
+        <div class="label"><span class="c">C</span>entenas</div><div class="value"><span class="c">${hundreds}</span> × 100 = ${hundreds*100}</div>
+        <div class="label"><span class="d">D</span>ecenas</div><div class="value"><span class="d">${tens}</span> × 10 = ${tens*10}</div>
+        <div class="label"><span class="u">U</span>nidades</div><div class="value"><span class="u">${units}</span> × 1 = ${units}</div>
         <div class="label">Total</div><div class="value">${total}</div>
         <div class="label">En letras</div><div class="value">${enLetras}</div>`;
     }
 
-    // Mini‑resumen (arriba)
-    setMiniStatus(`Total: ${total}  |  ${hundreds}<span class="c">C</span>  ${tens}<span class="d">D</span>  ${units}<span class="u">U</span>  (${enLetras})`);
+    // Mini‑resumen (texto plano)
+    setMiniStatus(`Total: ${total}  |  ${hundreds}c  ${tens}d  ${units}u  (${enLetras})`);
 
-    // Franja fija (abajo)
-    const stripHTML =
-  `Construcción — <span class="c">C</span>: ${hundreds} (${hundreds*100}) · ` +
-  `<span class="d">D</span>: ${tens} (${tens*10}) · ` +
-  `<span class="u">U</span>: ${units} (${units})  |  Total ${total} (${enLetras})`;
-setDetailsStrip(stripHTML);
+    // Franja inferior (con HTML y colores)
+    setDetailsStrip(
+      `Construcción — ` +
+      `<span class="c">C</span>:${hundreds} (${hundreds*100}) · ` +
+      `<span class="d">D</span>:${tens} (${tens*10}) · ` +
+      `<span class="u">U</span>:${units} (${units})  |  ` +
+      `Total ${total} (${enLetras})`
+    );
 
     if(challengeNumber!==null && total===challengeNumber){
       const ch=document.getElementById('challenge'); const msg=`🎉 ¡Correcto! Has formado ${enLetras}`;
@@ -414,74 +425,63 @@ setDetailsStrip(stripHTML);
   const b = countInRect(zoneB);
   const r = countInRect(zoneR);
 
-  const isResta = (oper === 'resta');
+  const isResta = (typeof oper!=='undefined' && oper==='resta');
   const L = (typeof LABELS !== 'undefined' && LABELS[oper]) ? LABELS[oper] : {A:'A',B:'B',R:'Resultado'};
 
-  // Línea de estado grande
+  // Estado superior
   const st=document.getElementById('status');
-  if(st) st.textContent = isResta
-    ? `${L.A}: ${a.total}  −  ${L.B}: ${b.total}  =  ${L.R}: ${r.total}`
-    : `${L.A}: ${a.total}  +  ${L.B}: ${b.total}  =  ${L.R}: ${r.total}`;
+  if(st){
+    st.innerHTML = isResta
+      ? `${L.A}: ${a.total}  −  ${L.B}: ${b.total}  =  ${L.R}: ${r.total}`
+      : `${L.A}: ${a.total}  +  ${L.B}: ${b.total}  =  ${L.R}: ${r.total}`;
+  }
 
-  // Desglose en el panel (con C, D, U coloreadas)
+  // Panel inferior
   const bd=document.getElementById('breakdown');
   if (bd){
     bd.innerHTML = isResta
       ? `
-        <div class="label">${L.A} (c=×100,d=×10,u=×1)</div>
-        <div class="value">
-          ${a.hundreds}<span class="c">C</span>, ${a.tens}<span class="d">D</span>, ${a.units}<span class="u">U</span> → ${a.total}
-        </div>
-        <div class="label">${L.B} (c=×100,d=×10,u=×1)</div>
-        <div class="value">
-          ${b.hundreds}<span class="c">C</span>, ${b.tens}<span class="d">D</span>, ${b.units}<span class="u">U</span> → ${b.total}
-        </div>
+        <div class="label">${L.A} (c=×100,d=×10,u=×1)</div><div class="value"><span class="c">${a.hundreds}</span>c, <span class="d">${a.tens}</span>d, <span class="u">${a.units}</span>u → ${a.total}</div>
+        <div class="label">${L.B} (c=×100,d=×10,u=×1)</div><div class="value"><span class="c">${b.hundreds}</span>c, <span class="d">${b.tens}</span>d, <span class="u">${b.units}</span>u → ${b.total}</div>
         <div class="label">A−B</div><div class="value">${a.total - b.total}</div>
         <div class="label">${L.R}</div><div class="value">${r.total}</div>
       `
       : `
-        <div class="label">${L.A} (c=×100,d=×10,u=×1)</div>
-        <div class="value">
-          ${a.hundreds}<span class="c">C</span>, ${a.tens}<span class="d">D</span>, ${a.units}<span class="u">U</span> → ${a.total}
-        </div>
-        <div class="label">${L.B} (c=×100,d=×10,u=×1)</div>
-        <div class="value">
-          ${b.hundreds}<span class="c">C</span>, ${b.tens}<span class="d">D</span>, ${b.units}<span class="u">U</span> → ${b.total}
-        </div>
+        <div class="label">${L.A} (c=×100,d=×10,u=×1)</div><div class="value"><span class="c">${a.hundreds}</span>c, <span class="d">${a.tens}</span>d, <span class="u">${a.units}</span>u → ${a.total}</div>
+        <div class="label">${L.B} (c=×100,d=×10,u=×1)</div><div class="value"><span class="c">${b.hundreds}</span>c, <span class="d">${b.tens}</span>d, <span class="u">${b.units}</span>u → ${b.total}</div>
         <div class="label">A+B</div><div class="value">${a.total + b.total}</div>
         <div class="label">${L.R}</div><div class="value">${r.total}</div>
       `;
   }
 
-  // Mini‑resumen (arriba) con spans coloreados
+  // Mini‑resumen (texto plano)
   setMiniStatus(
     `${isResta ? 'A−B' : 'A+B'}  |  A=${a.total}  B=${b.total}  ${L.R}=${r.total}  ·  ` +
-    `A: ${a.hundreds}<span class="c">C</span>-${a.tens}<span class="d">D</span>-${a.units}<span class="u">U</span> · ` +
-    `B: ${b.hundreds}<span class="c">C</span>-${b.tens}<span class="d">D</span>-${b.units}<span class="u">U</span>`
+    `A: ${a.hundreds}c-${a.tens}d-${a.units}u · ` +
+    `B: ${b.hundreds}c-${b.tens}d-${b.units}u`
   );
 
-  // Franja fija (abajo) — texto (sin HTML) para mantenerlo legible/seguro
-  const stripHTML =
-  `${isResta ? 'Restas' : 'Sumas'} — ` +
-  `${L.A}: <span class="c">C</span>${a.hundreds} <span class="d">D</span>${a.tens} <span class="u">U</span>${a.units} (=${a.total})  ·  ` +
-  `${L.B}: <span class="c">C</span>${b.hundreds} <span class="d">D</span>${b.tens} <span class="u">U</span>${b.units} (=${b.total})  ·  ` +
-  `${L.R}: <span class="c">C</span>${r.hundreds} <span class="d">D</span>${r.tens} <span class="u">U</span>${r.units} (=${r.total})`;
-setDetailsStrip(stripHTML);
+  // Franja inferior (HTML con colores)
+  setDetailsStrip(
+    `${isResta ? 'Restas' : 'Sumas'} — ` +
+    `${L.A}: <span class="c">${a.hundreds}</span>c <span class="d">${a.tens}</span>d <span class="u">${a.units}</span>u (=${a.total})  ·  ` +
+    `${L.B}: <span class="c">${b.hundreds}</span>c <span class="d">${b.tens}</span>d <span class="u">${b.units}</span>u (=${b.total})  ·  ` +
+    `${L.R}: <span class="c">${r.hundreds}</span>c <span class="d">${r.tens}</span>d <span class="u">${r.units}</span>u (=${r.total})`
+  );
 
   // Mensaje guía/reto
   const ch = document.getElementById('challenge');
   if (ch){
     if (!isResta){
-      if (r.total === a.total + b.total && (a.total>0 || b.total>0)){
-        ch.textContent = `🎉 ¡Perfecto! ${a.total} + ${b.total} = ${r.total}`;
-      } else {
-        ch.textContent = `➕ Construye: A + B = ${L.R}`;
-      }
+      ch.textContent = (r.total === a.total + b.total && (a.total>0 || b.total>0))
+        ? `🎉 ¡Perfecto! ${a.total} + ${b.total} = ${r.total}`
+        : `➕ Construye: A + B = ${L.R}`;
     } else {
       ch.textContent = `➖ Construye: A − B = ${L.R}`;
     }
   }
 }
+
 // ===== Reordenaciones construcción =====
 function centerInRectBox(b, z){ const cx=b.x+b.w/2, cy=b.y+b.h/2; return (cx>=z.x && cx<=z.x+z.w && cy>=z.y && cy<=z.y+z.h); }
 function reorderTensZone(){
