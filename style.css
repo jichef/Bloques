@@ -74,3 +74,28 @@ html, body {
 
 /* iOS: evitar zoom extraño al tocar botones */
 button { touch-action: manipulation; }
+/* Tamaños: status + panel inferior (breakdown) + franja inferior */
+#status {
+  font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 20px;
+  line-height: 1.3;
+  padding-top: 2px;
+}
+#breakdown {
+  font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 26px;     /* grande */
+  line-height: 1.5;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+}
+#details-strip {
+  font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 18px;     /* sube tamaño de la franja */
+  line-height: 1.3;
+}
+
+/* Colores de C, D y U — reutilizables en cualquier parte */
+.c { color:#2ecc71; font-weight:700; } /* Centenas (verde)  */
+.d { color:#ff3b30; font-weight:700; } /* Decenas  (rojo)   */
+.u { color:#1f78ff; font-weight:700; } /* Unidades (azul)   */
