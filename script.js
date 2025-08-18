@@ -524,6 +524,7 @@ function checkBuildZones(){
 }
 
 // ===== Botonera =====
+// ====== Helpers: crear/injectar UI que falta ======
 function ensureModeButton(){
   const controls = document.getElementById('controls');
   if (!controls) return;
@@ -543,56 +544,68 @@ function ensureModeButton(){
   controls.prepend(row);
 }
 
+function ensureSumInfo(){
+  // crea un contenedor textual para el enunciado (si no existe)
+  if (document.getElementById('sum-info')) return;
+  const controls = document.getElementById('controls');
+  if (!controls) return;
+
+  const row = document.createElement('div');
+  row.className = 'row';
+  const span = document.createElement('span');
+  span.id = 'sum-info';
+  span.style.display = 'none';
+  row.appendChild(span);
+  controls.appendChild(row);
+}
+
 // ====== Estado global de modo/ejercicio ======
           
 let ejercicio = null;                   // { tipo:'suma'|'resta', a:number, b:number }
 
 // ====== Helpers UI de modo ======
+// ====== Helpers UI de modo (arreglado) ======
 function setUIForMode(){
+  ensureSumInfo();
+
   const btnChallenge = document.getElementById('btn-challenge');
   const challengeTxt = document.getElementById('challenge');
   const sumInfo      = document.getElementById('sum-info');
-  const btnNewSum    = document.getElementById('btn-new-sum');
-  const btnNewSub    = document.getElementById('btn-new-sub');
-  const modeHint     = document.getElementById('mode-hint');
+  const btnSum       = document.getElementById('btn-sum'); // <- tus IDs reales
+  const btnSub       = document.getElementById('btn-sub');
 
   if (modo === 'construccion'){
-    // Mostrar reto, ocultar enunciado suma/resta y sus botones
+    // Mostrar reto, ocultar enunciado y botones de suma/resta
     if (btnChallenge) btnChallenge.style.display = '';
     if (challengeTxt) challengeTxt.style.display = '';
     if (sumInfo)      { sumInfo.style.display = 'none'; sumInfo.textContent = ''; }
-    if (btnNewSum)    btnNewSum.style.display = 'none';
-    if (btnNewSub)    btnNewSub.style.display = 'none';
-    if (modeHint)     modeHint.textContent = 'Modo construcción: crea bloques libremente.';
-    // Zonas “Decenas/Centenas” (tu layout de construcción)
-    if (typeof computeZonesAnchoredToViewport === 'function'){
-      computeZonesAnchoredToViewport();
-      drawZones();
-    }
-  } else {
-    // Ocultar reto; mostrar botones de nueva suma/resta y enunciado
+    if (btnSum)       btnSum.style.display = 'none';
+    if (btnSub)       btnSub.style.display = 'none';
+
+    // Zonas de construcción
+    computeZonesConstruccion();
+    drawZonesConstruccion();
+  } else { // 'sumas'
+    // Ocultar reto; mostrar enunciado y botones de suma/resta
     if (btnChallenge) btnChallenge.style.display = 'none';
     if (challengeTxt) { challengeTxt.style.display = 'none'; challengeTxt.textContent = ''; }
     if (sumInfo)      sumInfo.style.display = '';
-    if (btnNewSum)    btnNewSum.style.display = '';
-    if (btnNewSub)    btnNewSub.style.display = '';
-    if (modeHint)     modeHint.textContent = 'Modo sumas/restas: construye los sumandos en sus zonas.';
-    // Zonas de suma/resta (asegúrate de tener estas funciones en tu script)
-    if (typeof computeZonesSumas === 'function' && typeof drawZonesSumas === 'function'){
-      computeZonesSumas();
-      drawZonesSumas();
-    }
+    if (btnSum)       btnSum.style.display = '';
+    if (btnSub)       btnSub.style.display = '';
+
+    // Zonas de suma/resta
+    computeZonesSumas();
+    drawZonesSumas();
   }
 
-  // Reposiciona banda de aparición y refresca
-  if (typeof resetSpawnBase === 'function') resetSpawnBase();
-  if (typeof updateStatus === 'function')   updateStatus();
+  resetSpawnBase();
+  updateStatus();
 
-  // Marcar botón activo
-  const bC = document.getElementById('btn-mode-construccion');
-  const bS = document.getElementById('btn-mode-suma');
-  bC?.classList.toggle('active', modo==='construccion');
-  bS?.classList.toggle('active', modo==='sumas');
+  // marcar estado del botón de modo toggle si existe
+  const btnMode = document.getElementById('btn-mode');
+  if (btnMode){
+    btnMode.textContent = 'Modo: ' + (modo === 'construccion' ? 'Construcción' : 'Sumas');
+  }
 }
 
 function enterConstruccionMode(){
@@ -611,8 +624,39 @@ function enterSumasMode(){
 }
 
 // ====== Generadores de ejercicios ======
-function randInt(min, max){ // incluyente
-  return Math.floor(Math.random()*(max-min+1))+min;
+// ====== Generadores de ejercicios (usan tus IDs reales) ======
+function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+function newSum(a=null, b=null){
+  if (modo!=='sumas') enterSumasMode();
+  if (a===null) a = randInt(10, 99);
+  if (b===null) b = randInt(10, 99);
+
+  // limpiar piezas y mostrar enunciado
+  pieceLayer.destroyChildren(); pieceLayer.draw();
+  const info = document.getElementById('sum-info');
+  if (info) info.textContent = `Suma: ${a} + ${b}. Construye ${a} en “Sumando A”, ${b} en “Sumando B” y deja el total en “Resultado”.`;
+
+  computeZonesSumas(); drawZonesSumas();
+  resetSpawnBase();
+  updateStatus();
+  speak(`Nueva suma: ${a} más ${b}`);
+}
+
+function newSub(a=null, b=null){
+  if (modo!=='sumas') enterSumasMode();
+  if (a===null) a = randInt(20, 99);
+  if (b===null) b = randInt(10, a);
+  if (b>a) [a,b] = [b,a];
+
+  pieceLayer.destroyChildren(); pieceLayer.draw();
+  const info = document.getElementById('sum-info');
+  if (info) info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “Minuendo (A)”, ${b} en “Sustraendo (B)” y deja el resultado en “Resultado”.`;
+
+  computeZonesSumas(); drawZonesSumas();
+  resetSpawnBase();
+  updateStatus();
+  speak(`Nueva resta: ${a} menos ${b}`);
 }
 
 // Crea una suma a+b (por defecto 2 cifras) y muestra enunciado
@@ -658,30 +702,26 @@ function newSub(a=null, b=null){
   updateStatus();
 }
 
-// ====== Botonera (reemplaza tu wireUI actual por éste) ======
+// ====== Botonera (IDs de tu HTML) ======
 function wireUI(){
   const $ = id => document.getElementById(id);
 
-  // Botones de modo
-  $('#btn-mode-construccion')?.addEventListener('click', enterConstruccionMode);
-  $('#btn-mode-suma')?.addEventListener('click', enterSumasMode);
+  ensureModeButton();   // añade el botón “Modo: …” si no existe
+  ensureSumInfo();      // añade el span del enunciado si no existe
 
   // Crear piezas
   $('#btn-unit')   ?.addEventListener('click', ()=> createUnit());
   $('#btn-ten')    ?.addEventListener('click', ()=> createTen());
   $('#btn-hundred')?.addEventListener('click', ()=> createHundred());
 
-  // Suma/Resta
-  $('#btn-new-sum')?.addEventListener('click', ()=> newSum());
-  $('#btn-new-sub')?.addEventListener('click', ()=> newSub());
+  // Suma/Resta (IDs reales)
+  $('#btn-sum')?.addEventListener('click', ()=> newSum());
+  $('#btn-sub')?.addEventListener('click', ()=> newSub());
 
   // Limpiar
   $('#btn-clear')?.addEventListener('click', ()=>{
     pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase();
   });
-
-  // Componer (si aún lo usas)
-  $('#btn-compose')?.addEventListener('click', ()=> checkBuildZones?.());
 
   // Voz
   $('#btn-say')?.addEventListener('click', ()=>{
@@ -690,7 +730,7 @@ function wireUI(){
     hablarDescompYLetras(hundreds,tens,units,total,1100); 
   });
 
-  // Reto clásico (solo en construcción, pero además lo ocultamos en setUIForMode)
+  // Reto (solo construcción; además se oculta en setUIForMode)
   $('#btn-challenge')?.addEventListener('click', ()=>{
     if (modo!=='construccion') return;
     challengeNumber=Math.floor(Math.random()*900)+1;
@@ -699,7 +739,12 @@ function wireUI(){
     speak(`Forma el número ${numEnLetras(challengeNumber)}`);
   });
 
-  // Panel detalles
+  // Botón de modo toggle (si fue inyectado por ensureModeButton)
+  $('#btn-mode')?.addEventListener('click', (e)=>{
+    // ya tiene su listener dentro de ensureModeButton; no duplicamos
+  });
+
+  // Panel
   $('#panel-toggle')?.addEventListener('click', ()=>{
     const panel=$('#panel'); 
     const open=panel.classList.toggle('open'); 
@@ -711,8 +756,7 @@ function wireUI(){
 
   // Zoom
   const bindZoom=(id,fn)=>{
-    const el=$(id); 
-    if(!el) return; 
+    const el=$(id); if(!el) return;
     el.addEventListener('click', e=>{e.preventDefault(); fn();});
     el.addEventListener('pointerdown', e=>{e.preventDefault(); fn();});
   };
@@ -725,17 +769,17 @@ function wireUI(){
     applyWorldTransform();
 
     if (modo==='construccion'){ 
-      computeZonesAnchoredToViewport?.(); 
-      drawZones?.(); 
+      computeZonesConstruccion(); 
+      drawZonesConstruccion(); 
     } else { 
-      computeZonesSumas?.(); 
-      drawZonesSumas?.(); 
+      computeZonesSumas(); 
+      drawZonesSumas(); 
     }
     resetSpawnBase(); 
     updateStatus();
   });
 
-  // Aplica el estado visual del modo inicial
+  // Estado visual inicial
   setUIForMode();
 }
 
@@ -785,16 +829,14 @@ function startIntro(){
 }
 
 // ===== Cambio de modo =====
+
 function enterMode(m){
-  modo = m;
-  // limpiar UI zonas
+  modo = m === 'sumas' ? 'sumas' : 'construccion';
   uiLayer.destroyChildren();
-  // recalcular zonas del modo
-  if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); }
-  else { computeZonesSumas(); drawZonesSumas(); }
-  resetSpawnBase();
-  updateStatus();
+  setUIForMode();   // esto ya recalcula zonas + SPAWN + status
 }
+function enterConstruccionMode(){ enterMode('construccion'); }
+function enterSumasMode(){ enterMode('sumas'); }
 
 // Resize & boot
 function relayout(){
