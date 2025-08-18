@@ -1,6 +1,7 @@
 :root { 
   --ui-bg: #ffffffcc; 
   --strip-h: 44px;                 /* altura visible de la franja Detalles */
+  --ff-fix: 0px;                   /* padding extra específico para Firefox */
 }
 * { box-sizing: border-box; }
 
@@ -12,13 +13,25 @@ html, body {
 }
 
 /* ===== Canvas / contenedor =====
-   Reservamos la franja + área segura inferior para que no tape el lienzo */
+   Reservamos la franja + área segura + fix Firefox para que no tape el lienzo */
 #container { 
   position: fixed; 
   top: 0; 
   left: 0; 
   right: 0; 
-  bottom: calc(var(--strip-h) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--strip-h) + env(safe-area-inset-bottom, 0px) + var(--ff-fix));
+}
+/* Usa 100dvh cuando esté soportado para evitar “barras” móviles */
+@supports (height: 100dvh) {
+  #container {
+    height: calc(100dvh - (var(--strip-h) + env(safe-area-inset-bottom, 0px) + var(--ff-fix)));
+    top: 0; bottom: auto;
+  }
+}
+
+/* ===== Fix específico para Firefox (detectado por -moz-appearance) ===== */
+@supports (-moz-appearance: none) {
+  :root { --ff-fix: 8px; }   /* si aún queda justo, sube a 10px o 12px */
 }
 
 /* ===== Fuente personalizada Escolar ===== */
@@ -58,13 +71,13 @@ html, body {
 .u { color:#1f78ff; font-weight:700; }  /* Unidades (azul)   */
 
 /* ===== Franja inferior fija ("Detalles") =====
-   Altura = strip + área segura, para que nunca quede medio fuera. */
+   Altura = strip + área segura + fix Firefox, para que nunca quede medio fuera. */
 #details-strip{
   position: fixed;
   left: 0; right: 0; bottom: 0;
-  height: calc(var(--strip-h) + env(safe-area-inset-bottom, 0px));
+  height: calc(var(--strip-h) + env(safe-area-inset-bottom, 0px) + var(--ff-fix));
   padding: 0 14px;
-  padding-bottom: env(safe-area-inset-bottom, 0px);   /* hueco extra si hay notch/barra gestos */
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--ff-fix));
   display: flex; align-items: center; gap: 10px;
   background: rgba(255,255,255,0.96);
   border-top: 1px solid #e5e5e5;
