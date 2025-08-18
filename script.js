@@ -1061,22 +1061,7 @@ function wireUI(){
     sizeStageToContainer();        // por si cambia el alto útil
   });
 
-  // Franja inferior fija: también abre/cierra el panel
-  $('details-strip')?.addEventListener('click', ()=>{
-    const panel = $('panel');
-    const btn   = $('panel-toggle');
-    if (!panel) return;
-    const open = panel.classList.toggle('open');
-
-    if (btn){
-      btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
-      btn.setAttribute('aria-expanded', String(open));
-    }
-    panel.setAttribute('aria-hidden', String(!open));
-    syncDetailsStripWithPanel();
-    sizeStageToContainer();
-  });
-
+  // Franja inferior fija: también abre/cierra el 
   // Atajo teclado: T = toggle topbar
   window.addEventListener('keydown', (ev)=>{
     if ((ev.key==='t' || ev.key==='T') && !ev.metaKey && !ev.ctrlKey && !ev.altKey){
@@ -1189,16 +1174,35 @@ function relayout(){
 }
 addEventListener('resize', relayout);
 // ==== Toggle del panel al pulsar en la franja inferior ====
-document.getElementById("details-strip").addEventListener("click", function() {
-  const panel = document.getElementById("panel");
-  const caret = document.getElementById("details-caret");
-  const expanded = panel.classList.toggle("open");
+// ==== Toggle del panel al pulsar en la franja inferior ====
+{
+  const strip = document.getElementById('details-strip');
+  if (strip) {
+    strip.addEventListener('click', function () {
+      const panel = document.getElementById('panel');
+      const caret = document.getElementById('details-caret');
+      const btn   = document.getElementById('panel-toggle');
+      if (!panel) return;
 
-  // Cambiar icono y atributo aria
-  this.setAttribute("aria-expanded", expanded ? "true" : "false");
-  caret.textContent = expanded ? "⬇︎" : "⬆︎";
-});
-// ===== Boot =====
+      const open = panel.classList.toggle('open');
+
+      // Sincroniza caret + aria en la franja
+      this.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (caret) caret.textContent = open ? '⬇︎' : '⬆︎';
+
+      // Sincroniza el botón interno del panel
+      if (btn){
+        btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
+        btn.setAttribute('aria-expanded', String(open));
+      }
+      panel.setAttribute('aria-hidden', String(!open));
+
+      // Ajustes visuales auxiliares
+      if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
+      if (typeof sizeStageToContainer === 'function')      sizeStageToContainer();
+    });
+  }
+}// ===== Boot =====
 sizeStageToContainer();        // <-- ajusta al alto del #container calculado por CSS
 drawGrid();
 computeZonesConstruccion();    // arranca en construcción
