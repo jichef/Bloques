@@ -60,6 +60,8 @@ Este proyecto está bajo la licencia **Creative Commons Attribution 4.0 Internat
 Puedes usarlo, modificarlo y compartirlo libremente, siempre que cites la autoría:  
 
 **Autor: Juan Checa**  
+Colegio Nuestra Señora de la Consolacion (Granada)
+
 
 📖 Texto completo de la licencia: [CC BY 4.0](LICENSE.md)
 
