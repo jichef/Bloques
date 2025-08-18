@@ -545,7 +545,7 @@ function ensureModeButton(){
 }
 
 // ====== Estado global de modo/ejercicio ======
-let modo = 'construccion';              // 'construccion' | 'sumas'
+          
 let ejercicio = null;                   // { tipo:'suma'|'resta', a:number, b:number }
 
 // ====== Helpers UI de modo ======
