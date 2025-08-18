@@ -48,7 +48,7 @@
       font-size: 14px; 
       color:#1f2340; 
       white-space: nowrap; 
-      font-family: 'EscolarG', sans-serif; /* aquí fuente escolar */ 
+      font-family: 'EscolarG', sans-serif;
     }
 
     /* Lienzo */
@@ -71,7 +71,7 @@
       z-index: 10;
       cursor: pointer;
       user-select: none;
-      font-family: 'EscolarG', sans-serif; /* fuente escolar */
+      font-family: 'EscolarG', sans-serif;
     }
     #details-text{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
     #details-caret{ font-size: 12px; color: #636a8a; }
@@ -87,6 +87,7 @@
       transform: translateY(calc(100% - 34px));
       transition: transform .25s ease;
       pointer-events: none;
+      font-size: 18px; /* más grande */
     }
     #panel #panel-toggle { pointer-events: auto; }
     #panel.open {
@@ -97,23 +98,29 @@
     #panel-toggle { margin-left: auto; }
     #status { 
       font-weight: 600; 
-      font-family: 'EscolarG', sans-serif; /* fuente escolar */ 
+      font-family: 'EscolarG', sans-serif;
+      font-size: 22px; /* más grande */
     }
     #breakdown { 
       display: grid; 
       grid-template-columns: 140px 1fr; 
       gap: 4px 12px; 
       margin-top: 8px; 
-      font-family: 'EscolarG', sans-serif; /* fuente escolar */ 
+      font-family: 'EscolarG', sans-serif; 
+      font-size: 18px; /* más grande */
     }
     #mode-hint, #sum-info, #challenge { color: var(--muted); font-family: 'EscolarG', sans-serif; }
+
+    /* === COLORES C, D, U === */
+    #breakdown .value .c { color:#2ecc71; font-weight:700; } /* Centenas (verde)  */
+    #breakdown .value .d { color:#ff3b30; font-weight:700; } /* Decenas (rojo)   */
+    #breakdown .value .u { color:#1f78ff; font-weight:700; } /* Unidades (azul)  */
   </style>
 </head>
 <body>
   <!-- Barra superior -->
   <div id="topbar">
     <div id="controls" role="toolbar" aria-label="Controles">
-      <!-- Botones aquí (igual que antes)… -->
       <button id="btn-mode-construccion" class="active">Construcción</button>
       <button id="btn-mode-suma">Sumas</button>
       <button id="btn-new-sum" style="display:none">Nueva suma</button>
