@@ -1,5 +1,5 @@
 // ===== Bloques — script.js (v17.1.0: Construcción + Sumas, zonas ancladas al viewport, SPAWN visible sin solapes, TACHADO + Corrección + Toggle Topbar) =====
-console.log("Bloques v17.2.0 + corrección + toggle topbar");
+console.log("Bloques v17.2.1 + corrección + toggle topbar");
 
 Konva.pixelRatio = 1;
 
