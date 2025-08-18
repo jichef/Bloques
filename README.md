@@ -28,7 +28,6 @@ Permite trabajar con **unidades, decenas y centenas**, formar números, realizar
 
 Coloca y agrupa bloques libremente para formar numeros.
 
-
 - **Botón Reto**: aparece un número al azar que deberás formar.  
 - **Niveles de dificultad**: básico (1-10), intermedio (1-99) y experto (1-999).
 - **Doble clic**: descompone centenas en decenas y decenas en unidades.  
@@ -39,38 +38,19 @@ Coloca y agrupa bloques libremente para formar numeros.
 
 Coloca y agrupa bloques en los espacios Sumando A y B en el caso de sumas, o minuendo y sustraendo, para las restas, para agruparlos en el resultado. 
 
-
 - **Nueva suma/Nueva resta**: aparece una operacion deberás formar.  
 - **Niveles de dificultad**: básico (operaciones que dan como resultado 1-9), intermedio (como resultado 1-99, con o sin llevadas) y experto (1-999, con o sin llevadas).
 - **Doble clic**: descompone centenas en decenas y decenas en unidades.  
 - **Control+clic**: para la resta cuando se agrupan en la diferencia o resultado se "tachan" los bloques del sustraendo para que queden fuera del resultado.
 - **Botón Limpiar**: elimina todos los bloques para empezar de nuevo.  
 
-
 ---
 
 ## 👩‍🏫 Público objetivo
 
-- Niños de **primaria** que comienzan a trabajar el concepto de decenas y centenas.  
+- Niños de **primaria** que comienzan a trabajar el concepto de unidades, decenas y centenas.  
 - Profesores que buscan una herramienta interactiva para reforzar el cálculo.  
 - Familias que quieren una forma lúdica de practicar matemáticas en casa.  
-
----
-
-## 📸 Capturas de ejemplo
-
-*(Aquí puedes incluir capturas de pantalla o un GIF animado mostrando cómo se usan los bloques)*
-
----
-
-## 🤝 Contribuciones
-
-Las contribuciones son bienvenidas:  
-1. Haz un fork de este repositorio.  
-2. Crea una rama (`git checkout -b feature/nueva-funcion`).  
-3. Haz commit de tus cambios (`git commit -m 'Añadir nueva función'`).  
-4. Sube la rama (`git push origin feature/nueva-funcion`).  
-5. Abre un Pull Request.  
 
 ---
 
