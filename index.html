@@ -21,9 +21,29 @@
       --text:#1f2340;
       --muted:#636a8a;
       --btn:#ffffff;
-    }
-    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
 
+      /* Altura visible de la franja “Detalles” */
+      --strip-h: 44px;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    /* ===== Lienzo: reserva espacio para la franja inferior + área segura ===== */
+    #container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: calc(var(--strip-h) + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* ===== Barra superior ===== */
     #topbar {
       position: relative;
       display: flex;
@@ -33,6 +53,7 @@
       background: var(--bar);
       border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
+      z-index: 30;
     }
     #controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     button {
@@ -44,47 +65,42 @@
     #panel-correccion { margin-left: auto; font-size: 14px; color: var(--muted); }
     #panel-correccion .ok { color: #2ecc71; font-weight: 600; }
 
-    #mini-status { 
-      font-size: 14px; 
-      color:#1f2340; 
-      white-space: nowrap; 
-      font-family: 'EscolarG', sans-serif;
+    #mini-status {
+      font-size: 14px;
+      color:#1f2340;
+      white-space: nowrap;
+      font-family: 'EscolarG', sans-serif; /* fuente escolar */
     }
 
-    /* Lienzo */
-    #container { width: 100vw; height: calc(100vh - 48px - 34px); }
-    @media (max-width: 720px){
-      #container { height: calc(100vh - 56px - 34px); }
-    }
-
-    /* Franja inferior */
+    /* ===== Franja inferior fija: “Detalles” ===== */
     #details-strip{
       position: fixed;
       left: 0; right: 0; bottom: 0;
-      height: 34px;
+      height: calc(var(--strip-h) + env(safe-area-inset-bottom, 0px));
       display: flex; align-items: center; gap: 10px;
       padding: 0 14px;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
       background: rgba(255,255,255,0.96);
       border-top: 1px solid var(--border);
-      font-size: 14px;
+      font-size: 18px; /* más grande */
       color: #1f2340;
-      z-index: 10;
+      z-index: 25;
       cursor: pointer;
       user-select: none;
-      font-family: 'EscolarG', sans-serif;
+      font-family: 'EscolarG', sans-serif; /* fuente escolar */
     }
     #details-text{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
     #details-caret{ font-size: 12px; color: #636a8a; }
 
-    /* Panel inferior */
-    #panel-wrap { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; }
+    /* ===== Panel inferior (plegable) ===== */
+    #panel-wrap { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; }
     #panel {
       max-height: 40vh;
       overflow: auto;
       background: rgba(255,255,255,0.96);
       border-top: 1px solid var(--border);
       padding: 10px 14px;
-      transform: translateY(calc(100% - 34px));
+      transform: translateY(calc(100% - var(--strip-h)));
       transition: transform .25s ease;
       pointer-events: none;
       font-size: 18px; /* más grande */
@@ -96,25 +112,36 @@
     }
     #panel-header { display: flex; align-items: center; gap: 10px; }
     #panel-toggle { margin-left: auto; }
-    #status { 
-      font-weight: 600; 
+
+    /* ===== Textos con tipografía EscolarG ===== */
+    #status {
+      font-weight: 600;
       font-family: 'EscolarG', sans-serif;
       font-size: 22px; /* más grande */
     }
-    #breakdown { 
-      display: grid; 
-      grid-template-columns: 140px 1fr; 
-      gap: 4px 12px; 
-      margin-top: 8px; 
-      font-family: 'EscolarG', sans-serif; 
+    #breakdown {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 4px 12px;
+      margin-top: 8px;
+      font-family: 'EscolarG', sans-serif;
       font-size: 18px; /* más grande */
     }
     #mode-hint, #sum-info, #challenge { color: var(--muted); font-family: 'EscolarG', sans-serif; }
 
-    /* === COLORES C, D, U === */
-    #breakdown .value .c { color:#2ecc71; font-weight:700; } /* Centenas (verde)  */
-    #breakdown .value .d { color:#ff3b30; font-weight:700; } /* Decenas (rojo)   */
-    #breakdown .value .u { color:#1f78ff; font-weight:700; } /* Unidades (azul)  */
+    /* ===== Colores C, D, U ===== */
+    .c { color:#2ecc71; font-weight:700; } /* centenas (verde) */
+    .d { color:#ff3b30; font-weight:700; } /* decenas  (rojo)  */
+    .u { color:#1f78ff; font-weight:700; } /* unidades (azul)  */
+
+    /* iOS: evitar zoom extraño al tocar botones */
+    button { touch-action: manipulation; }
+
+    /* Ajuste móvil: topbar algo más alta => contenedor deja hueco suficiente */
+    @media (max-width: 720px){
+      /* si quisieras, puedes ajustar --strip-h aquí, p.ej.: */
+      /* :root { --strip-h: 50px; } */
+    }
   </style>
 </head>
 <body>
@@ -141,13 +168,16 @@
     <div id="mini-status"></div>
   </div>
 
+  <!-- Lienzo -->
   <div id="container"></div>
 
+  <!-- Franja inferior fija -->
   <div id="details-strip">
     <span id="details-text">Detalles…</span>
     <span id="details-caret">⬆︎</span>
   </div>
 
+  <!-- Panel plegable -->
   <div id="panel-wrap">
     <div id="panel">
       <div id="panel-header">
@@ -164,6 +194,6 @@
   </div>
 
   <script src="https://unpkg.com/konva@9/konva.min.js"></script>
-  <script src="script.js?v=17.1c"></script>
+  <script src="script.js?v=17.1d"></script>
 </body>
 </html>
