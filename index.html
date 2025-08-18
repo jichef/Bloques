@@ -68,15 +68,41 @@
   <div id="container"></div>
 
   <!-- Barra superior -->
-  <div id="controls">
-    <div class="row">
-      <button id="add-unit">+U</button>
-      <button id="add-ten">+D</button>
-      <button id="add-hundred">+C</button>
-      <button id="reset">Limpiar</button>
-    </div>
-    <div id="status">Listo</div>
+<div id="controls">
+  <div class="row">
+    <button id="btn-mode-construccion">🧱 Construcción</button>
+    <button id="btn-mode-suma">➕/➖ Sumas/Restas</button>
+
+    <span id="sum-info" style="margin-left:8px; display:none;"></span>
+    <span id="challenge" style="margin-left:auto;"></span>
+
+    <button id="btn-toggle-topbar" style="margin-left:auto;">Ocultar barra</button>
   </div>
+
+  <div class="row">
+    <!-- Generadores (solo se muestran en modo sumas) -->
+    <button id="btn-new-sum"  style="display:none;">Nueva suma</button>
+    <button id="btn-new-sub"  style="display:none;">Nueva resta</button>
+
+    <!-- Crear piezas -->
+    <button id="btn-unit">+U</button>
+    <button id="btn-ten">+D</button>
+    <button id="btn-hundred">+C</button>
+
+    <!-- Acciones varias -->
+    <button id="btn-clear">Limpiar</button>
+    <button id="btn-say">🔊 Decir</button>
+    <button id="btn-challenge">🎯 Reto</button>
+    <button id="btn-corregir">✅ Corregir</button>
+
+    <!-- Zoom/Vista -->
+    <button id="btn-zoom-out">−</button>
+    <button id="btn-zoom-in">＋</button>
+    <button id="btn-reset-view">Recentrar</button>
+  </div>
+
+  <div class="row" id="status">Listo.</div>
+</div>
 
   <!-- Panel inferior -->
   <div id="panel">
