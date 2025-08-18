@@ -204,10 +204,12 @@ function updateStrikeVisual(g){
   g.draw();
 }
 
+// Reemplaza la versión anterior
 function setDetailsStrip(html){
   const el = document.getElementById('details-text');
-  if (el) el.innerHTML = html || 'Detalles…';
+  if (el) el.innerHTML = html || 'Detalles…';   // <- innerHTML
 }
+
 function syncDetailsStripWithPanel(){
   const strip = document.getElementById('details-strip');
   const panel = document.getElementById('panel');
