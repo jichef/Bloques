@@ -895,7 +895,7 @@ const btnUnit    = document.getElementById('btn-unit');
   btnSumas?.classList.toggle('active', enSumas);
 
   // Reposicionar SPAWN y refrescar estado
-  updateControlsVisibility();
+  
   resetSpawnBase();
   updateStatus();
   syncDetailsStripWithPanel();
