@@ -37,7 +37,7 @@ function applyWorldTransform(){
 }
 // ---- MODO & SUMAS ----
 let modo = 'construccion';           // 'construccion' | 'suma'
-let modo = 'sumas';
+
 let SUM = { a: null, b: null };      // objetivos del modo suma
 // Utils
 const toCell = n => Math.round(n/GRID)*GRID;
