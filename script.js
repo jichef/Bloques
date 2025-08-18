@@ -1070,43 +1070,39 @@ function pickSumOperands(diff) {
 function pickSubOperands(diff) {
   if (!diff || diff === 'auto') diff = 'media';
 
-  // fácil: 2 cifras sin préstamo (A ≥ B, unidades sin préstamo)
+  // ===== FÁCIL: 0–9 sin préstamo (A ≥ B), resultado 0–9
   if (diff === 'facil') {
-    let a, b, guard = 0;
-    do {
-      a = randInt(0, 9;
-      b = randInt(0, a);
-      guard++;
-    } while ((a % 10) < (b % 10) && guard < 200); // evita préstamo en U
+    const a = randInt(0, 9);      // 0..9
+    const b = randInt(0, a);      // 0..a  => garantiza A ≥ B, sin préstamo
     return [a, b];
   }
 
-  // media: 2 cifras, permitimos préstamo a veces (no forzado)
+  // ===== MEDIA: 2 cifras, permitimos préstamo a veces (no forzado)
   if (diff === 'media') {
-    const a = randInt(10, 99);
-    const b = randInt(10, a);
+    let a = randInt(10, 99);
+    let b = randInt(10, a);       // ambos de 2 cifras y A ≥ B
     return [a, b];
   }
 
-  // dificil: 2 cifras con préstamo garantizado en unidades
+  // ===== DIFÍCIL: 2 cifras con préstamo garantizado en unidades
   if (diff === 'dificil') {
     let a, b, guard = 0;
     do {
       a = randInt(10, 99);
-      b = randInt(10, a);
+      b = randInt(10, a);         // asegura A ≥ B
       guard++;
     } while ((a % 10) >= (b % 10) && guard < 200); // fuerza préstamo en U
     return [a, b];
   }
 
-  // experto: 3 cifras (puede haber múltiples préstamos)
+  // ===== EXPERTO: 3 cifras (puede haber múltiples préstamos)
   if (diff === 'experto') {
     let a = randInt(100, 999);
-    let b = randInt(100, a);
+    let b = randInt(100, a);      // asegura A ≥ B
     return [a, b];
   }
 
-  // fallback
+  // Fallback sensato
   let a = randInt(10, 99);
   let b = randInt(10, a);
   return [a, b];
