@@ -564,36 +564,37 @@ function ensureSumInfo(){
 let ejercicio = null;                   // { tipo:'suma'|'resta', a:number, b:number }
 
 // ====== Helpers UI de modo ======
-// ====== Helpers UI de modo (arreglado) ======
 function setUIForMode(){
   ensureSumInfo();
 
   const btnChallenge = document.getElementById('btn-challenge');
   const challengeTxt = document.getElementById('challenge');
   const sumInfo      = document.getElementById('sum-info');
-  const btnSum       = document.getElementById('btn-sum'); // <- tus IDs reales
+  const btnSum       = document.getElementById('btn-sum'); // tus IDs reales
   const btnSub       = document.getElementById('btn-sub');
 
   if (modo === 'construccion'){
-    // Mostrar reto, ocultar enunciado y botones de suma/resta
-    if (btnChallenge) btnChallenge.style.display = '';
-    if (challengeTxt) challengeTxt.style.display = '';
-    if (sumInfo)      { sumInfo.style.display = 'none'; sumInfo.textContent = ''; }
-    if (btnSum)       btnSum.style.display = 'none';
-    if (btnSub)       btnSub.style.display = 'none';
+    // Reto visible
+    if (btnChallenge) { btnChallenge.style.display = 'inline-block'; }
+    if (challengeTxt) { challengeTxt.style.display = 'inline'; }
 
-    // Zonas de construcción
+    // Enunciado y generadores ocultos
+    if (sumInfo) { sumInfo.style.display = 'none'; sumInfo.textContent = ''; }
+    if (btnSum)  { btnSum.style.display  = 'none'; }
+    if (btnSub)  { btnSub.style.display  = 'none'; }
+
     computeZonesConstruccion();
     drawZonesConstruccion();
   } else { // 'sumas'
-    // Ocultar reto; mostrar enunciado y botones de suma/resta
-    if (btnChallenge) btnChallenge.style.display = 'none';
+    // Ocultar reto
+    if (btnChallenge) { btnChallenge.style.display = 'none'; }
     if (challengeTxt) { challengeTxt.style.display = 'none'; challengeTxt.textContent = ''; }
-    if (sumInfo)      sumInfo.style.display = '';
-    if (btnSum)       btnSum.style.display = '';
-    if (btnSub)       btnSub.style.display = '';
 
-    // Zonas de suma/resta
+    // Mostrar enunciado y generadores (forzamos inline-block)
+    if (sumInfo) { sumInfo.style.display = 'inline'; }
+    if (btnSum)  { btnSum.style.display  = 'inline-block'; }
+    if (btnSub)  { btnSub.style.display  = 'inline-block'; }
+
     computeZonesSumas();
     drawZonesSumas();
   }
@@ -601,7 +602,7 @@ function setUIForMode(){
   resetSpawnBase();
   updateStatus();
 
-  // marcar estado del botón de modo toggle si existe
+  // Si usas el botón toggle "Modo: …"
   const btnMode = document.getElementById('btn-mode');
   if (btnMode){
     btnMode.textContent = 'Modo: ' + (modo === 'construccion' ? 'Construcción' : 'Sumas');
@@ -701,20 +702,34 @@ function newSub(a=null, b=null){
   resetSpawnBase();
   updateStatus();
 }
-
-// ====== Botonera (IDs de tu HTML) ======
+function bindAny(ids, handler){
+  ids.forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', handler);
+  });
+}
 function wireUI(){
   const $ = id => document.getElementById(id);
 
   ensureModeButton();   // añade el botón “Modo: …” si no existe
   ensureSumInfo();      // añade el span del enunciado si no existe
 
+  // Botones de modo explícitos (soportamos varios IDs posibles)
+  bindAny(['btn-mode-construccion','btn-construccion','btn-construction'], enterConstruccionMode);
+  bindAny(['btn-mode-suma','btn-mode-sumas','btn-sumas','btn-sumrest'], enterSumasMode);
+
+  // Botón toggle "Modo: …" (inyectado por ensureModeButton)
+  $('#btn-mode')?.addEventListener('click', ()=>{
+    modo = (modo === 'construccion') ? 'sumas' : 'construccion';
+    enterMode(modo);
+  });
+
   // Crear piezas
   $('#btn-unit')   ?.addEventListener('click', ()=> createUnit());
   $('#btn-ten')    ?.addEventListener('click', ()=> createTen());
   $('#btn-hundred')?.addEventListener('click', ()=> createHundred());
 
-  // Suma/Resta (IDs reales)
+  // Generar ejercicios (IDs reales de tu HTML)
   $('#btn-sum')?.addEventListener('click', ()=> newSum());
   $('#btn-sub')?.addEventListener('click', ()=> newSub());
 
@@ -730,18 +745,13 @@ function wireUI(){
     hablarDescompYLetras(hundreds,tens,units,total,1100); 
   });
 
-  // Reto (solo construcción; además se oculta en setUIForMode)
+  // Reto (solo construcción; también se oculta en setUIForMode)
   $('#btn-challenge')?.addEventListener('click', ()=>{
     if (modo!=='construccion') return;
     challengeNumber=Math.floor(Math.random()*900)+1;
     const ch=$('challenge'); 
     if(ch) ch.textContent=`🎯 Forma el número: ${challengeNumber}`;
     speak(`Forma el número ${numEnLetras(challengeNumber)}`);
-  });
-
-  // Botón de modo toggle (si fue inyectado por ensureModeButton)
-  $('#btn-mode')?.addEventListener('click', (e)=>{
-    // ya tiene su listener dentro de ensureModeButton; no duplicamos
   });
 
   // Panel
@@ -782,7 +792,6 @@ function wireUI(){
   // Estado visual inicial
   setUIForMode();
 }
-
 // Pan & zoom
 let isPanning=false, lastPointerPos=null;
 stage.on('mousedown touchstart', (e)=>{ if(e.target && e.target.getLayer && e.target.getLayer()===pieceLayer) return; isPanning=true; lastPointerPos=stage.getPointerPosition(); });
