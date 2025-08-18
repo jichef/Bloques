@@ -648,6 +648,7 @@ function setUIForMode(){
   // Reposicionar SPAWN y refrescar estado
   resetSpawnBase();
   updateStatus();
+  ensureMiniStatus();   
 }
 
 function enterMode(m){
@@ -698,6 +699,55 @@ function newSub(a=null, b=null){
   resetSpawnBase();
   updateStatus();
   try{ speak(`Nueva resta: ${a} menos ${b}`);}catch{}
+}
+
+// === Asegurar mini-resumen visible en la barra ===
+function ensureMiniStatus(){
+  const topbar = document.getElementById('topbar');
+  if (!topbar) return null;
+
+  // 1) Espaciador flexible para empujar a la derecha
+  let spacer = document.getElementById('topbar-spacer');
+  if (!spacer) {
+    spacer = document.createElement('div');
+    spacer.id = 'topbar-spacer';
+    spacer.style.flex = '1 1 auto';
+  }
+
+  // 2) Panel de corrección y mini-status
+  let corr = document.getElementById('panel-correccion');
+  let mini = document.getElementById('mini-status');
+  if (!mini) {
+    mini = document.createElement('div');
+    mini.id = 'mini-status';
+    mini.style.fontSize = '14px';
+    mini.style.whiteSpace = 'nowrap';
+    mini.style.color = '#1f2340';
+  }
+
+  // 3) Insertar en orden: [controles] [spacer] [mini-status] [panel-correccion]
+  const controls = document.getElementById('controls');
+
+  if (controls) {
+    // Asegura que el spacer quede justo después de los controles
+    if (!spacer.parentNode) topbar.insertBefore(spacer, controls.nextSibling);
+    else if (spacer.previousElementSibling !== controls)
+      topbar.insertBefore(spacer, controls.nextSibling);
+  } else {
+    if (!spacer.parentNode) topbar.appendChild(spacer);
+  }
+
+  // Coloca mini-status antes del panel de corrección
+  if (corr) {
+    corr.style.marginLeft = '0'; // evita que "expulse" al mini-status
+    if (mini.parentNode !== topbar || mini.nextElementSibling !== corr) {
+      topbar.insertBefore(mini, corr);
+    }
+  } else {
+    if (!mini.parentNode) topbar.appendChild(mini);
+  }
+
+  return mini;
 }
 
 // ====== Wire UI (delegación) ======
@@ -895,11 +945,13 @@ function relayout(){
 addEventListener('resize', relayout);
 
 // Boot
+// Boot
 drawGrid();
-computeZonesConstruccion(); // arranca en construcción
+computeZonesConstruccion();
 drawZonesConstruccion();
 applyWorldTransform();
 resetSpawnBase();
+ensureMiniStatus();     // <-- añade esto
 wireUI();
 updateStatus();
 pieceLayer.draw();
