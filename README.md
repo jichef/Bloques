@@ -20,18 +20,32 @@ Permite trabajar con **unidades, decenas y centenas**, formar números, realizar
 - 🔊 **Lectura en voz alta** del número y su descomposición.  
 - 📱 **Soporte táctil y teclado**.  
 - 🖥️ **Pantalla completa** y cuadrícula invisible para orden visual.  
-- ✍️ Tipografía escolar (`escolar.ttf`) si está disponible.  
+- ✍️ Tipografía escolar (`escolar.woff2`) si está disponible.  
 
 ---
 
-## 🕹️ Instrucciones de uso
+## 🕹️ Instrucciones de uso del Modo Construcción
 
-- **Modo Construcción**: coloca y agrupa bloques libremente.  
-- **Modo Sumas**: resuelve sumas/restas según el nivel elegido.  
+Coloca y agrupa bloques libremente para formar numeros.
+
+
 - **Botón Reto**: aparece un número al azar que deberás formar.  
+- **Niveles de dificultad**: básico (1-10), intermedio (1-99) y experto (1-999).
 - **Doble clic**: descompone centenas en decenas y decenas en unidades.  
-- **Arrastrar y soltar**: mueve bloques sobre la cuadrícula.  
+- **Arrastrar y soltar**: mueve bloques sobre la cuadrícula. Forma decenas y centenas arrastrando a las zonas de construcción.
 - **Botón Limpiar**: elimina todos los bloques para empezar de nuevo.  
+
+## 🕹️ Instrucciones de uso del Modo Suma/Resta
+
+Coloca y agrupa bloques en los espacios Sumando A y B en el caso de sumas, o minuendo y sustraendo, para las restas, para agruparlos en el resultado. 
+
+
+- **Nueva suma/Nueva resta**: aparece una operacion deberás formar.  
+- **Niveles de dificultad**: básico (operaciones que dan como resultado 1-9), intermedio (como resultado 1-99, con o sin llevadas) y experto (1-999, con o sin llevadas).
+- **Doble clic**: descompone centenas en decenas y decenas en unidades.  
+- **Control+clic**: para la resta cuando se agrupan en la diferencia o resultado se "tachan" los bloques del sustraendo para que queden fuera del resultado.
+- **Botón Limpiar**: elimina todos los bloques para empezar de nuevo.  
+
 
 ---
 
