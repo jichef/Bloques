@@ -471,12 +471,11 @@ function ensureSumInfo(){
 }
 
 // ====== Helpers UI de modo ======
-// --- setUIForMode (reemplaza la tuya) ---
 function setUIForMode(){
   const btnChallenge = document.getElementById('btn-challenge');
   const challengeTxt = document.getElementById('challenge');
   const sumInfo      = document.getElementById('sum-info');
-  const btnSum       = document.getElementById('btn-new-sum'); // <-- IDs de tu HTML
+  const btnSum       = document.getElementById('btn-new-sum'); // IDs EXACTOS de tu HTML
   const btnSub       = document.getElementById('btn-new-sub');
 
   if (modo === 'construccion'){
@@ -487,7 +486,8 @@ function setUIForMode(){
     if (btnSum)  btnSum.style.display  = 'none';
     if (btnSub)  btnSub.style.display  = 'none';
 
-    computeZonesConstruccion(); drawZonesConstruccion();
+    computeZonesConstruccion(); 
+    drawZonesConstruccion();
   } else {
     if (btnChallenge) btnChallenge.style.display = 'none';
     if (challengeTxt){ challengeTxt.style.display = 'none'; challengeTxt.textContent = ''; }
@@ -496,7 +496,8 @@ function setUIForMode(){
     if (btnSum)  btnSum.style.display  = 'inline-block';
     if (btnSub)  btnSub.style.display  = 'inline-block';
 
-    computeZonesSumas(); drawZonesSumas();
+    computeZonesSumas(); 
+    drawZonesSumas();
   }
 
   resetSpawnBase();
@@ -517,35 +518,46 @@ function enterSumasMode(){ enterMode('sumas'); }
 
 // ====== Generadores de ejercicios ======
 function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
 function newSum(a=null, b=null){
-  if (modo!=='sumas') enterSumasMode();
+  if (modo!=='sumas') enterMode('sumas'); // asegura el modo y la UI
   if (a===null) a = randInt(10, 99);
   if (b===null) b = randInt(10, 99);
 
   pieceLayer.destroyChildren(); pieceLayer.draw();
-  const info = document.getElementById('sum-info');
-  if (info) info.textContent = `Suma: ${a} + ${b}. Construye ${a} en “Sumando A”, ${b} en “Sumando B” y deja el total en “Resultado”.`;
 
-  computeZonesSumas(); drawZonesSumas();
+  const info = document.getElementById('sum-info');
+  if (info){
+    info.style.display = 'inline';
+    info.textContent = `Suma: ${a} + ${b}. Construye ${a} en “Sumando A”, ${b} en “Sumando B” y deja el total en “Resultado”.`;
+  }
+
+  computeZonesSumas(); 
+  drawZonesSumas(); 
   resetSpawnBase();
   updateStatus();
-  speak(`Nueva suma: ${a} más ${b}`);
+  try{ speak(`Nueva suma: ${a} más ${b}`);}catch{}
 }
 
 function newSub(a=null, b=null){
-  if (modo!=='sumas') enterSumasMode();
+  if (modo!=='sumas') enterMode('sumas');
   if (a===null) a = randInt(20, 99);
   if (b===null) b = randInt(10, a);
   if (b>a) [a,b] = [b,a];
 
   pieceLayer.destroyChildren(); pieceLayer.draw();
-  const info = document.getElementById('sum-info');
-  if (info) info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “Minuendo (A)”, ${b} en “Sustraendo (B)” y deja el resultado en “Resultado”.`;
 
-  computeZonesSumas(); drawZonesSumas();
+  const info = document.getElementById('sum-info');
+  if (info){
+    info.style.display = 'inline';
+    info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “Minuendo (A)”, ${b} en “Sustraendo (B)” y deja el total en “Resultado”.`;
+  }
+
+  computeZonesSumas(); 
+  drawZonesSumas(); 
   resetSpawnBase();
   updateStatus();
-  speak(`Nueva resta: ${a} menos ${b}`);
+  try{ speak(`Nueva resta: ${a} menos ${b}`);}catch{}
 }
 
 // ====== Wire UI ======
@@ -558,82 +570,92 @@ function bindAny(ids, handler){
 // --- wireUI (reemplaza la tuya) ---
 function wireUI(){
   const $ = id => document.getElementById(id);
+  const on = (id, cb) => { const el = $(id); if (el) { el.addEventListener('click', cb); console.log('✔︎ Listener:', id); } else { console.warn('✖︎ Falta elemento:', id); } };
 
-  // Botones de modo explícitos (los que tienes en el HTML)
-  $('#btn-mode-construccion')?.addEventListener('click', ()=> enterMode('construccion'));
-  $('#btn-mode-suma')?.addEventListener('click', ()=> enterMode('sumas'));
+  // Modo explícito (los IDs de tu HTML)
+  on('btn-mode-construccion', ()=> enterMode('construccion'));
+  on('btn-mode-suma',         ()=> enterMode('sumas'));
 
   // Crear piezas
-  $('#btn-unit')   ?.addEventListener('click', ()=> createUnit());
-  $('#btn-ten')    ?.addEventListener('click', ()=> createTen());
-  $('#btn-hundred')?.addEventListener('click', ()=> createHundred());
+  on('btn-unit',    ()=> { console.log('click: btn-unit');    try{ createUnit();    }catch(e){ console.error('createUnit error', e);} });
+  on('btn-ten',     ()=> { console.log('click: btn-ten');     try{ createTen();     }catch(e){ console.error('createTen error', e);} });
+  on('btn-hundred', ()=> { console.log('click: btn-hundred'); try{ createHundred(); }catch(e){ console.error('createHundred error', e);} });
 
-  // Generadores (IDs correctos en tu HTML)
-  $('#btn-new-sum')?.addEventListener('click', ()=> newSum());
-  $('#btn-new-sub')?.addEventListener('click', ()=> newSub());
+  // Generadores (IDs EXACTOS)
+  on('btn-new-sum', ()=> { console.log('click: btn-new-sum'); newSum(); });
+  on('btn-new-sub', ()=> { console.log('click: btn-new-sub'); newSub(); });
 
   // Limpiar
-  $('#btn-clear')?.addEventListener('click', ()=>{
-    pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase();
+  on('btn-clear', ()=>{ 
+    console.log('click: btn-clear');
+    pieceLayer.destroyChildren(); 
+    pieceLayer.draw(); 
+    updateStatus(); 
+    resetSpawnBase();
   });
 
   // Voz
-  $('#btn-say')?.addEventListener('click', ()=>{
-    const {units,tens,hundreds,total}=countAll();
-    if(total===0) return;
-    hablarDescompYLetras(hundreds,tens,units,total,1100);
+  on('btn-say', ()=>{ 
+    console.log('click: btn-say');
+    const {units,tens,hundreds,total}=countAll(); 
+    if(total===0) return; 
+    hablarDescompYLetras(hundreds,tens,units,total,1100); 
   });
 
   // Reto
-  $('#btn-challenge')?.addEventListener('click', ()=>{
+  on('btn-challenge', ()=>{
+    console.log('click: btn-challenge');
     if (modo!=='construccion') return;
-    challengeNumber = Math.floor(Math.random()*900)+1;
-    const ch = $('#challenge');
-    if (ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
+    challengeNumber=Math.floor(Math.random()*900)+1;
+    const ch=$('challenge'); 
+    if(ch) ch.textContent=`🎯 Forma el número: ${challengeNumber}`;
     speak(`Forma el número ${numEnLetras(challengeNumber)}`);
   });
 
   // Panel
-  $('#panel-toggle')?.addEventListener('click', ()=>{
-    const panel=$('#panel');
-    const open=panel.classList.toggle('open');
-    const btn=$('#panel-toggle');
-    btn.textContent=open?'⬇︎ Ocultar detalles':'⬆︎ Detalles';
-    btn.setAttribute('aria-expanded', String(open));
+  on('panel-toggle', ()=>{
+    const panel=$('panel'); 
+    const open=panel.classList.toggle('open'); 
+    const btn=$('panel-toggle');
+    btn.textContent=open?'⬇︎ Ocultar detalles':'⬆︎ Detalles'; 
+    btn.setAttribute('aria-expanded', String(open)); 
     panel.setAttribute('aria-hidden', String(!open));
   });
 
-  // Zoom
+  // Zoom (usa click + pointerdown para móviles)
   const bindZoom=(id,fn)=>{
-    const el=$(id); if(!el) return;
+    const el=$(id); if(!el) { console.warn('✖︎ Falta elemento zoom:', id); return; }
     el.addEventListener('click', e=>{ e.preventDefault(); fn(); });
     el.addEventListener('pointerdown', e=>{ e.preventDefault(); fn(); });
+    console.log('✔︎ Listener:', id);
   };
-  bindZoom('btn-zoom-in',  ()=> zoomStep(+1));
-  bindZoom('btn-zoom-out', ()=> zoomStep(-1));
+  bindZoom('btn-zoom-in',  ()=>zoomStep(+1));
+  bindZoom('btn-zoom-out', ()=>zoomStep(-1));
   bindZoom('btn-reset-view', ()=>{
     world.scale=1;
     world.x = stage.width()/2  - WORLD_W/2;
     world.y = stage.height()/2 - WORLD_H/2;
     applyWorldTransform();
+
     if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); }
     else                      { computeZonesSumas();       drawZonesSumas();       }
-    resetSpawnBase();
+
+    resetSpawnBase(); 
     updateStatus();
   });
 
-  // Comenzar con el modo actual
+  // Estado visual inicial
   setUIForMode();
 
-  // 👀 Diagnóstico: ver qué botones se encontraron
+  // Diagnóstico: qué encontró realmente
   console.table({
-    btn_unit: !!$('#btn-unit'),
-    btn_ten: !!$('#btn-ten'),
-    btn_hundred: !!$('#btn-hundred'),
-    btn_new_sum: !!$('#btn-new-sum'),
-    btn_new_sub: !!$('#btn-new-sub'),
-    btn_mode_construccion: !!$('#btn-mode-construccion'),
-    btn_mode_suma: !!$('#btn-mode-suma'),
+    'btn-unit': !!$('#btn-unit'),
+    'btn-ten': !!$('#btn-ten'),
+    'btn-hundred': !!$('#btn-hundred'),
+    'btn-new-sum': !!$('#btn-new-sum'),
+    'btn-new-sub': !!$('#btn-new-sub'),
+    'btn-mode-construccion': !!$('#btn-mode-construccion'),
+    'btn-mode-suma': !!$('#btn-mode-suma'),
   });
 }
 
