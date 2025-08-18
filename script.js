@@ -197,7 +197,41 @@ function attachStrikeHandlers(g){
   });
   g.on('dragend', ()=>{ if (isStriked(g)) updateStrikeVisual(g); });
 }
+// ——— Forzar listeners del panel (idempotente) ———
+function ensurePanelListeners(){
+  const panel = document.getElementById('panel');
+  const btn   = document.getElementById('panel-toggle');
+  const strip = document.getElementById('details-strip');
 
+  if (!panel) return;
+
+  const handler = () => {
+    const open = panel.classList.toggle('open');
+    if (btn){
+      btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
+      btn.setAttribute('aria-expanded', String(open));
+    }
+    panel.setAttribute('aria-hidden', String(!open));
+    if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
+    if (typeof sizeStageToContainer === 'function') sizeStageToContainer();
+  };
+
+  // Clonar y reemplazar para quitar listeners previos y evitar duplicados
+  if (btn){
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.addEventListener('click', handler);
+  }
+
+  if (strip){
+    const newStrip = strip.cloneNode(true);
+    strip.parentNode.replaceChild(newStrip, strip);
+    newStrip.addEventListener('click', handler);
+  }
+
+  // Sincroniza el caret/aria al cargar
+  if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
+}
 // ===== SPAWN visible sin solapes =====
 const SPAWN = { baseX:0, baseY:0, curX:0, curY:0, rowH:GRID*2, band:{x:0,y:0,w:0,h:0} };
 
@@ -786,27 +820,26 @@ function ensureMiniStatus(){
 
 // ====== Wire UI (delegación) ======
 function wireUI(){
-  // Evita menú contextual por defecto en el canvas para usar clic derecho como “tachar”
+  // Evita el menú contextual en el canvas (usamos clic derecho para tachar)
   document.getElementById('container')?.addEventListener('contextmenu', e=> e.preventDefault());
 
   const $ = id => document.getElementById(id);
   const controls = $('controls');
   if (!controls) { console.error('❌ #controls no encontrado'); return; }
 
-  // Asegura mini‑resumen arriba (espaciado correcto en la topbar)
+  // Asegura mini‑resumen y espaciado correcto en la topbar
   ensureMiniStatus();
 
-  // Delegación de eventos: un solo listener para TODOS los botones dentro de #controls
+  // Delegación de eventos para TODOS los botones dentro de #controls
   controls.addEventListener('click', (e)=>{
     const btn = e.target.closest('button');
     if (!btn || !controls.contains(btn)) return;
 
     switch(btn.id){
-
       // Cambio de modo
       case 'btn-mode-construccion':
         modo = 'construccion';
-        setUIForMode();
+        setUIForMode();               // recalcula zonas + SPAWN + status
         syncDetailsStripWithPanel();
         break;
 
@@ -821,17 +854,20 @@ function wireUI(){
       case 'btn-ten':     createTen();     break;
       case 'btn-hundred': createHundred(); break;
 
-      // Generadores (sólo visibles en modo sumas)
+      // Generadores (visibles en modo sumas)
       case 'btn-new-sum': newSum(); break;
       case 'btn-new-sub': newSub(); break;
 
       // Limpiar todo
       case 'btn-clear':
-        pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase();
+        pieceLayer.destroyChildren();
+        pieceLayer.draw();
+        updateStatus();
+        resetSpawnBase();
         syncDetailsStripWithPanel();
         break;
 
-      // Zoom
+      // Zoom / Vista
       case 'btn-zoom-in':    zoomStep(+1); break;
       case 'btn-zoom-out':   zoomStep(-1); break;
       case 'btn-reset-view':
@@ -864,30 +900,28 @@ function wireUI(){
         break;
       }
 
-      // ✅ CORREGIR SUMA
+      // Corregir suma (modo sumas)
       case 'btn-corregir':
         corregirActual();
         break;
 
-      // ⬆️/⬇️ Ocultar barra superior
-      // ⬆️/⬇️ Ocultar barra superior
-case 'btn-toggle-topbar': {
-  const bar = document.getElementById('topbar');
-  if (!bar) return;
-  const hidden = bar.style.display !== 'none';
-  bar.style.display = hidden ? 'none' : 'flex';
-  btn.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
-  // Reajusta el canvas usando el alto real del contenedor
-  sizeStageToContainer();
-  break;
-
+      // Ocultar/mostrar barra superior
+      case 'btn-toggle-topbar': {
+        const bar = $('topbar');
+        if (!bar) return;
+        const hidden = bar.style.display !== 'none';
+        bar.style.display = hidden ? 'none' : 'flex';
+        btn.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
+        sizeStageToContainer();   // reajusta canvas con el alto real del contenedor
+        break;
+      }
     }
   });
 
-  // Panel plegable: botón principal
-  $('#panel-toggle')?.addEventListener('click', ()=>{
-    const panel = $('#panel');
-    const btn   = $('#panel-toggle');
+  // Panel plegable: botón dentro del panel
+  $('panel-toggle')?.addEventListener('click', ()=>{
+    const panel = $('panel');
+    const btn   = $('panel-toggle');
     if (!panel) return;
     const open  = panel.classList.toggle('open');
 
@@ -896,15 +930,14 @@ case 'btn-toggle-topbar': {
       btn.setAttribute('aria-expanded', String(open));
     }
     panel.setAttribute('aria-hidden', String(!open));
-
-    // 🔁 Sincroniza franja fija (caret y aria-expanded)
-    syncDetailsStripWithPanel();
+    syncDetailsStripWithPanel();   // caret/aria de la franja
+    sizeStageToContainer();        // por si cambia el alto útil
   });
 
-  // Franja fija inferior: abre/cierra el panel también
-  $('#details-strip')?.addEventListener('click', ()=>{
-    const panel = $('#panel');
-    const btn   = $('#panel-toggle');
+  // Franja inferior fija: también abre/cierra el panel
+  $('details-strip')?.addEventListener('click', ()=>{
+    const panel = $('panel');
+    const btn   = $('panel-toggle');
     if (!panel) return;
     const open = panel.classList.toggle('open');
 
@@ -913,26 +946,24 @@ case 'btn-toggle-topbar': {
       btn.setAttribute('aria-expanded', String(open));
     }
     panel.setAttribute('aria-hidden', String(!open));
-
-    // 🔁 Sincroniza caret/aria de la franja
     syncDetailsStripWithPanel();
+    sizeStageToContainer();
   });
 
-  // Atajo teclado: T = toggle topbar (si existe)
-  // Atajo teclado: T = toggle topbar (si existe)
-window.addEventListener('keydown', (ev)=>{
-  if ((ev.key==='t' || ev.key==='T') && !ev.metaKey && !ev.ctrlKey && !ev.altKey){
-    const bar = document.getElementById('topbar');
-    const btn = document.getElementById('btn-toggle-topbar');
-    if (!bar) return;
-    const hidden = bar.style.display !== 'none';
-    bar.style.display = hidden ? 'none' : 'flex';
-    if (btn) btn.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
-    sizeStageToContainer();  // 👈 en vez de tocar innerHeight a mano
-  }
-});
+  // Atajo teclado: T = toggle topbar
+  window.addEventListener('keydown', (ev)=>{
+    if ((ev.key==='t' || ev.key==='T') && !ev.metaKey && !ev.ctrlKey && !ev.altKey){
+      const bar = $('topbar');
+      const btn = $('btn-toggle-topbar');
+      if (!bar) return;
+      const hidden = bar.style.display !== 'none';
+      bar.style.display = hidden ? 'none' : 'flex';
+      if (btn) btn.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
+      sizeStageToContainer();
+    }
+  });
 
-  // Estado visual inicial
+  // Estado inicial coherente
   setUIForMode();
   syncDetailsStripWithPanel(); // asegura caret correcto al cargar
 }
@@ -1041,6 +1072,7 @@ resetSpawnBase();
 
 ensureMiniStatus();            // mini‑resumen en topbar (y corrige el espaciado)
 wireUI();                      // listeners (incluye panel-toggle si usas mi wireUI actualizado)
+ensurePanelListeners();   
 if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
 
 updateStatus();
