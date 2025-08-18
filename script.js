@@ -841,6 +841,7 @@ function setUIForMode(){
   btnSumas?.classList.toggle('active', enSumas);
 
   // Reposicionar SPAWN y refrescar estado
+  updateControlsVisibility();
   resetSpawnBase();
   updateStatus();
   syncDetailsStripWithPanel();
@@ -880,7 +881,47 @@ function enterMode(m){
 }
 function enterConstruccionMode(){ enterMode('construccion'); }
 function enterSumasMode(){ enterMode('sumas'); }
+// ==== Grupos de controles por modo ====
+const CONTROL_GROUPS = {
+  buildOnly: [
+    'btn-challenge', 'btn-diff-inicial', 'btn-diff-medio', 'btn-diff-avanzado',
+    'btn-unit', 'btn-ten', 'btn-hundred', 'btn-say'
+  ],
+  sumOnly: [
+    'btn-new-sum', 'btn-new-sub', 'btn-corregir',
+    'btn-sumdiff-basico', 'btn-sumdiff-avanzado', 'btn-sumdiff-experto'
+  ],
+  common: [
+    'btn-clear', 'btn-zoom-in', 'btn-zoom-out', 'btn-reset-view', 'btn-toggle-topbar',
+    'btn-mode-construccion', 'btn-mode-suma'
+  ],
+  // spans/indicadores (no son <button>)
+  buildIndicators: ['diff-indicator'],
+  sumIndicators:   ['sumdiff-indicator']
+};
 
+function showEls(ids, displayMode){
+  ids.forEach(id=>{
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = displayMode;
+  });
+}
+
+// Llama a esto siempre que cambie el modo
+function updateControlsVisibility(){
+  const inBuild = (modo === 'construccion');
+  const inSum   = (modo === 'sumas');
+
+  // Botones
+  showEls(CONTROL_GROUPS.buildOnly, inBuild ? 'inline-block' : 'none');
+  showEls(CONTROL_GROUPS.sumOnly,   inSum   ? 'inline-block' : 'none');
+  showEls(CONTROL_GROUPS.common,    'inline-block');
+
+  // Indicadores <span>
+  showEls(CONTROL_GROUPS.buildIndicators, inBuild ? 'inline' : 'none');
+  showEls(CONTROL_GROUPS.sumIndicators,   inSum   ? 'inline' : 'none');
+}
 // ====== Generadores de ejercicios ======
 function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
 function newSum(a=null, b=null){
