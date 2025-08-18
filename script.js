@@ -783,11 +783,17 @@ function ensureMiniStatus(){
 
 // ====== Wire UI (delegación) ======
 function wireUI(){
+  // Evita menú contextual por defecto en el canvas para usar clic derecho como “tachar”
   document.getElementById('container')?.addEventListener('contextmenu', e=> e.preventDefault());
+
   const $ = id => document.getElementById(id);
   const controls = $('controls');
   if (!controls) { console.error('❌ #controls no encontrado'); return; }
 
+  // Asegura mini‑resumen arriba (espaciado correcto en la topbar)
+  ensureMiniStatus();
+
+  // Delegación de eventos: un solo listener para TODOS los botones dentro de #controls
   controls.addEventListener('click', (e)=>{
     const btn = e.target.closest('button');
     if (!btn || !controls.contains(btn)) return;
@@ -798,11 +804,13 @@ function wireUI(){
       case 'btn-mode-construccion':
         modo = 'construccion';
         setUIForMode();
+        syncDetailsStripWithPanel();
         break;
 
       case 'btn-mode-suma':
         modo = 'sumas';
         setUIForMode();
+        syncDetailsStripWithPanel();
         break;
 
       // Crear piezas
@@ -817,6 +825,7 @@ function wireUI(){
       // Limpiar todo
       case 'btn-clear':
         pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase();
+        syncDetailsStripWithPanel();
         break;
 
       // Zoom
@@ -830,15 +839,17 @@ function wireUI(){
         if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); }
         else                      { computeZonesSumas();       drawZonesSumas();       }
         resetSpawnBase(); updateStatus();
+        syncDetailsStripWithPanel();
         break;
 
       // Reto (modo construcción)
       case 'btn-challenge': {
         if (modo!=='construccion') return;
-        challengeNumber = Math.floor(Math.random()*900)+1;
+        const n = Math.floor(Math.random()*900)+1;
+        challengeNumber = n;
         const ch = $('challenge');
-        if (ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
-        speak(`Forma el número ${numEnLetras(challengeNumber)}`);
+        if (ch) ch.textContent = `🎯 Forma el número: ${n}`;
+        speak(`Forma el número ${numEnLetras(n)}`);
         break;
       }
 
@@ -870,14 +881,38 @@ function wireUI(){
     }
   });
 
-  // Panel detalles
+  // Panel plegable: botón principal
   $('#panel-toggle')?.addEventListener('click', ()=>{
     const panel = $('#panel');
-    const open  = panel.classList.toggle('open');
     const btn   = $('#panel-toggle');
-    btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
-    btn.setAttribute('aria-expanded', String(open));
+    if (!panel) return;
+    const open  = panel.classList.toggle('open');
+
+    if (btn){
+      btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
+      btn.setAttribute('aria-expanded', String(open));
+    }
     panel.setAttribute('aria-hidden', String(!open));
+
+    // 🔁 Sincroniza franja fija (caret y aria-expanded)
+    syncDetailsStripWithPanel();
+  });
+
+  // Franja fija inferior: abre/cierra el panel también
+  $('#details-strip')?.addEventListener('click', ()=>{
+    const panel = $('#panel');
+    const btn   = $('#panel-toggle');
+    if (!panel) return;
+    const open = panel.classList.toggle('open');
+
+    if (btn){
+      btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
+      btn.setAttribute('aria-expanded', String(open));
+    }
+    panel.setAttribute('aria-hidden', String(!open));
+
+    // 🔁 Sincroniza caret/aria de la franja
+    syncDetailsStripWithPanel();
   });
 
   // Atajo teclado: T = toggle topbar (si existe)
@@ -893,20 +928,10 @@ function wireUI(){
       stage.batchDraw();
     }
   });
-document.getElementById('details-strip')?.addEventListener('click', ()=>{
-  const panel = document.getElementById('panel');
-  const btn   = document.getElementById('panel-toggle');
-  if (!panel) return;
-  const open = panel.classList.toggle('open');
-  if (btn){
-    btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
-    btn.setAttribute('aria-expanded', String(open));
-  }
-  panel.setAttribute('aria-hidden', String(!open));
-  syncDetailsStripWithPanel();
-});
+
   // Estado visual inicial
   setUIForMode();
+  syncDetailsStripWithPanel(); // asegura caret correcto al cargar
 }
 
 // Pan & zoom
