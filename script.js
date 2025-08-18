@@ -204,9 +204,9 @@ function updateStrikeVisual(g){
   g.draw();
 }
 
-function setDetailsStrip(texto){
+function setDetailsStrip(html){
   const el = document.getElementById('details-text');
-  if (el) el.textContent = texto || 'Detalles…';
+  if (el) el.innerHTML = html || 'Detalles…';
 }
 function syncDetailsStripWithPanel(){
   const strip = document.getElementById('details-strip');
@@ -396,9 +396,11 @@ function updateStatus(){
     setMiniStatus(`Total: ${total}  |  ${hundreds}<span class="c">C</span>  ${tens}<span class="d">D</span>  ${units}<span class="u">U</span>  (${enLetras})`);
 
     // Franja fija (abajo)
-    setDetailsStrip(
-      `Construcción — C:${hundreds} (${hundreds*100}) · D:${tens} (${tens*10}) · U:${units} (${units})  |  Total ${total} (${enLetras})`
-    );
+    const stripHTML =
+  `Construcción — <span class="c">C</span>: ${hundreds} (${hundreds*100}) · ` +
+  `<span class="d">D</span>: ${tens} (${tens*10}) · ` +
+  `<span class="u">U</span>: ${units} (${units})  |  Total ${total} (${enLetras})`;
+setDetailsStrip(stripHTML);
 
     if(challengeNumber!==null && total===challengeNumber){
       const ch=document.getElementById('challenge'); const msg=`🎉 ¡Correcto! Has formado ${enLetras}`;
@@ -459,12 +461,12 @@ function updateStatus(){
   );
 
   // Franja fija (abajo) — texto (sin HTML) para mantenerlo legible/seguro
-  setDetailsStrip(
-    `${isResta ? 'Restas' : 'Sumas'} — ` +
-    `${L.A}: ${a.hundreds}c ${a.tens}d ${a.units}u (=${a.total})  ·  ` +
-    `${L.B}: ${b.hundreds}c ${b.tens}d ${b.units}u (=${b.total})  ·  ` +
-    `${L.R}: ${r.hundreds}c ${r.tens}d ${r.units}u (=${r.total})`
-  );
+  const stripHTML =
+  `${isResta ? 'Restas' : 'Sumas'} — ` +
+  `${L.A}: <span class="c">C</span>${a.hundreds} <span class="d">D</span>${a.tens} <span class="u">U</span>${a.units} (=${a.total})  ·  ` +
+  `${L.B}: <span class="c">C</span>${b.hundreds} <span class="d">D</span>${b.tens} <span class="u">U</span>${b.units} (=${b.total})  ·  ` +
+  `${L.R}: <span class="c">C</span>${r.hundreds} <span class="d">D</span>${r.tens} <span class="u">U</span>${r.units} (=${r.total})`;
+setDetailsStrip(stripHTML);
 
   // Mensaje guía/reto
   const ch = document.getElementById('challenge');
