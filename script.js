@@ -1072,7 +1072,7 @@ resetSpawnBase();
 
 ensureMiniStatus();            // mini‑resumen en topbar (y corrige el espaciado)
 wireUI();                      // listeners (incluye panel-toggle si usas mi wireUI actualizado)
-ensurePanelListeners();   
+
 if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
 
 updateStatus();
