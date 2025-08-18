@@ -1052,9 +1052,12 @@ stage.on('mousedown touchstart', (e)=>{
   if (e.target && e.target.getLayer && e.target.getLayer() === pieceLayer) return;
   isPanning = true;
   lastPointerPos = stage.getPointerPosition();
+  if (e.evt) e.evt.preventDefault();      // 👈 evita scroll iOS
 });
-stage.on('mousemove touchmove', ()=>{
+
+stage.on('mousemove touchmove', (e)=>{
   if(!isPanning) return;
+  if (e.evt) e.evt.preventDefault();      // 👈 evita scroll iOS
   const pos = stage.getPointerPosition();
   if(!pos || !lastPointerPos) return;
   const dx = pos.x - lastPointerPos.x;
@@ -1065,7 +1068,12 @@ stage.on('mousemove touchmove', ()=>{
   lastPointerPos = pos;
   resetSpawnBase();
 });
-stage.on('mouseup touchend', ()=>{ isPanning=false; lastPointerPos=null; });
+
+stage.on('mouseup touchend', (e)=>{
+  isPanning=false;
+  lastPointerPos=null;
+  if (e.evt) e.evt.preventDefault();      // opcional; mantiene simetría
+});
 stage.on('wheel', (e)=>{
   e.evt.preventDefault();
   const old = world.scale;
