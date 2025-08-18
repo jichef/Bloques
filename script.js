@@ -902,18 +902,19 @@ function setUIForMode(){
   const btnNewSum = document.getElementById('btn-new-sum');
   const btnNewSub = document.getElementById('btn-new-sub');
 
-  // Botones de piezas
+  // Botones de piezas SIEMPRE visibles
   const btnUnit    = document.getElementById('btn-unit');
   const btnTen     = document.getElementById('btn-ten');
   const btnHundred = document.getElementById('btn-hundred');
 
   const enSumas = (modo === 'sumas');
 
-  // Mostrar/ocultar según modo
-  if (btnUnit)    btnUnit.style.display    = enSumas ? 'none' : 'inline-block';
-  if (btnTen)     btnTen.style.display     = enSumas ? 'none' : 'inline-block';
-  if (btnHundred) btnHundred.style.display = enSumas ? 'none' : 'inline-block';
+  // ✅ Piezas: siempre visibles
+  if (btnUnit)    btnUnit.style.display    = 'inline-block';
+  if (btnTen)     btnTen.style.display     = 'inline-block';
+  if (btnHundred) btnHundred.style.display = 'inline-block';
 
+  // Resto de controles según modo
   if (btnChallenge) btnChallenge.style.display = enSumas ? 'none' : 'inline-block';
   if (challengeTxt){
     challengeTxt.style.display = enSumas ? 'none' : 'inline';
@@ -934,11 +935,11 @@ function setUIForMode(){
     if (modeHint) modeHint.textContent = 'Modo construcción: crea y compón bloques libremente.';
   }
 
-  // Marcar pestañas activas
+  // Marcar pestañas
   btnConstruccion?.classList.toggle('active', !enSumas);
   btnSumas?.classList.toggle('active', enSumas);
 
-  // Reposicionar SPAWN y refrescar estado
+  // Visibilidad grupos + estado
   if (typeof updateControlsVisibility === 'function') updateControlsVisibility();
   resetSpawnBase();
   updateStatus();
@@ -983,17 +984,18 @@ function enterSumasMode(){ enterMode('sumas'); }
 const CONTROL_GROUPS = {
   buildOnly: [
     'btn-challenge', 'btn-diff-inicial', 'btn-diff-medio', 'btn-diff-avanzado',
-    'btn-unit', 'btn-ten', 'btn-hundred', 'btn-say'
+    'btn-say'
   ],
   sumOnly: [
     'btn-new-sum', 'btn-new-sub', 'btn-corregir',
     'btn-sumdiff-basico', 'btn-sumdiff-avanzado', 'btn-sumdiff-experto'
   ],
   common: [
-    'btn-clear', 'btn-zoom-in', 'btn-zoom-out', 'btn-reset-view', 'btn-toggle-topbar',
+    'btn-unit', 'btn-ten', 'btn-hundred',                 // ✅ siempre visibles
+    'btn-clear', 'btn-zoom-in', 'btn-zoom-out',
+    'btn-reset-view', 'btn-toggle-topbar',
     'btn-mode-construccion', 'btn-mode-suma'
   ],
-  // spans/indicadores (no son <button>)
   buildIndicators: ['diff-indicator'],
   sumIndicators:   ['sumdiff-indicator']
 };
