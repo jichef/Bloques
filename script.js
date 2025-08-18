@@ -685,13 +685,14 @@ function wireUI(){
         break;
 
       // Reto clásico (se oculta en modo sumas por setUIForMode)
-      case 'btn-challenge':
-        if (modo!=='construccion') return;
-        challengeNumber = Math.floor(Math.random()*900)+1;
-        const ch = $('challenge');
-        if(ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
-        speak(`Forma el número ${numEnLetras(challengeNumber)}`);
-        break;
+      case 'btn-challenge': {
+  if (modo!=='construccion') return;
+  challengeNumber = Math.floor(Math.random()*900)+1;
+  const ch = $('challenge');
+  if (ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
+  speak(`Forma el número ${numEnLetras(challengeNumber)}`);
+  break;
+}
 
       // Voz
       case 'btn-say':
