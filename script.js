@@ -374,7 +374,7 @@ function hablarDescompYLetras(h,t,u,total,pausa=1000){
 }
 
 let challengeNumber=null;
-  function updateStatus(){
+function updateStatus(){
   if (modo === 'construccion'){
     const {units,tens,hundreds,total}=countAll();
     const enLetras=numEnLetras(total);
@@ -393,10 +393,12 @@ let challengeNumber=null;
     }
 
     // Mini‑resumen (arriba)
-    setMiniStatus(`Total: ${total}  |  ${hundreds}c  ${tens}d  ${units}u  (${enLetras})`);
+    setMiniStatus(`Total: ${total}  |  ${hundreds}<span class="c">C</span>  ${tens}<span class="d">D</span>  ${units}<span class="u">U</span>  (${enLetras})`);
 
     // Franja fija (abajo)
-    setDetailsStrip(`Construcción — C:${hundreds} (${hundreds*100}) · D:${tens} (${tens*10}) · U:${units} (${units})  |  Total ${total} (${enLetras})`);
+    setDetailsStrip(
+      `Construcción — C:${hundreds} (${hundreds*100}) · D:${tens} (${tens*10}) · U:${units} (${units})  |  Total ${total} (${enLetras})`
+    );
 
     if(challengeNumber!==null && total===challengeNumber){
       const ch=document.getElementById('challenge'); const msg=`🎉 ¡Correcto! Has formado ${enLetras}`;
@@ -419,32 +421,44 @@ let challengeNumber=null;
     ? `${L.A}: ${a.total}  −  ${L.B}: ${b.total}  =  ${L.R}: ${r.total}`
     : `${L.A}: ${a.total}  +  ${L.B}: ${b.total}  =  ${L.R}: ${r.total}`;
 
-  // Desglose en el panel
+  // Desglose en el panel (con C, D, U coloreadas)
   const bd=document.getElementById('breakdown');
   if (bd){
     bd.innerHTML = isResta
       ? `
-        <div class="label">${L.A} (c=×100,d=×10,u=×1)</div><div class="value">${a.hundreds}c, ${a.tens}d, ${a.units}u → ${a.total}</div>
-        <div class="label">${L.B} (c=×100,d=×10,u=×1)</div><div class="value">${b.hundreds}c, ${b.tens}d, ${b.units}u → ${b.total}</div>
+        <div class="label">${L.A} (c=×100,d=×10,u=×1)</div>
+        <div class="value">
+          ${a.hundreds}<span class="c">C</span>, ${a.tens}<span class="d">D</span>, ${a.units}<span class="u">U</span> → ${a.total}
+        </div>
+        <div class="label">${L.B} (c=×100,d=×10,u=×1)</div>
+        <div class="value">
+          ${b.hundreds}<span class="c">C</span>, ${b.tens}<span class="d">D</span>, ${b.units}<span class="u">U</span> → ${b.total}
+        </div>
         <div class="label">A−B</div><div class="value">${a.total - b.total}</div>
         <div class="label">${L.R}</div><div class="value">${r.total}</div>
       `
       : `
-        <div class="label">${L.A} (c=×100,d=×10,u=×1)</div><div class="value">${a.hundreds}c, ${a.tens}d, ${a.units}u → ${a.total}</div>
-        <div class="label">${L.B} (c=×100,d=×10,u=×1)</div><div class="value">${b.hundreds}c, ${b.tens}d, ${b.units}u → ${b.total}</div>
+        <div class="label">${L.A} (c=×100,d=×10,u=×1)</div>
+        <div class="value">
+          ${a.hundreds}<span class="c">C</span>, ${a.tens}<span class="d">D</span>, ${a.units}<span class="u">U</span> → ${a.total}
+        </div>
+        <div class="label">${L.B} (c=×100,d=×10,u=×1)</div>
+        <div class="value">
+          ${b.hundreds}<span class="c">C</span>, ${b.tens}<span class="d">D</span>, ${b.units}<span class="u">U</span> → ${b.total}
+        </div>
         <div class="label">A+B</div><div class="value">${a.total + b.total}</div>
         <div class="label">${L.R}</div><div class="value">${r.total}</div>
       `;
   }
 
-  // Mini‑resumen (arriba)
+  // Mini‑resumen (arriba) con spans coloreados
   setMiniStatus(
     `${isResta ? 'A−B' : 'A+B'}  |  A=${a.total}  B=${b.total}  ${L.R}=${r.total}  ·  ` +
-    `A: ${a.hundreds}c-${a.tens}d-${a.units}u · ` +
-    `B: ${b.hundreds}c-${b.tens}d-${b.units}u`
+    `A: ${a.hundreds}<span class="c">C</span>-${a.tens}<span class="d">D</span>-${a.units}<span class="u">U</span> · ` +
+    `B: ${b.hundreds}<span class="c">C</span>-${b.tens}<span class="d">D</span>-${b.units}<span class="u">U</span>`
   );
 
-  // Franja fija (abajo)
+  // Franja fija (abajo) — texto (sin HTML) para mantenerlo legible/seguro
   setDetailsStrip(
     `${isResta ? 'Restas' : 'Sumas'} — ` +
     `${L.A}: ${a.hundreds}c ${a.tens}d ${a.units}u (=${a.total})  ·  ` +
