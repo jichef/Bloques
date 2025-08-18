@@ -944,7 +944,34 @@ function ensureMiniStatus(){
 
   return mini;
 }
+function togglePanel(forceOpen = null){
+  const panel = document.getElementById('panel');
+  if (!panel) return;
 
+  const caret = document.getElementById('details-caret');
+  const btn   = document.getElementById('panel-toggle');
+  const strip = document.getElementById('details-strip');
+
+  const newOpen = (forceOpen === null)
+    ? !panel.classList.contains('open')
+    : !!forceOpen;
+
+  panel.classList.toggle('open', newOpen);
+
+  // Accesibilidad + UI
+  if (strip) {
+    strip.setAttribute('aria-expanded', newOpen ? 'true' : 'false');
+  }
+  if (caret) caret.textContent = newOpen ? '⬇︎' : '⬆︎';
+  if (btn) {
+    btn.textContent = newOpen ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
+    btn.setAttribute('aria-expanded', String(newOpen));
+  }
+  panel.setAttribute('aria-hidden', String(!newOpen));
+
+  if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
+  if (typeof sizeStageToContainer === 'function')      sizeStageToContainer();
+}
 // ====== Wire UI (delegación) ======
 function wireUI(){
   // Evita el menú contextual en el canvas (usamos clic derecho para tachar)
@@ -1172,6 +1199,8 @@ function relayout(){
   // Mantén la flecha de la franja en sync cuando cambie el layout
   if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
 }
+document.getElementById('panel-toggle')?.addEventListener('click', ()=> togglePanel());
+document.getElementById('details-strip')?.addEventListener('click', ()=> togglePanel());
 addEventListener('resize', relayout);
 // ==== Toggle del panel al pulsar en la franja inferior ====
 // ==== Toggle del panel al pulsar en la franja inferior ====
