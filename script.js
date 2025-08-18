@@ -954,11 +954,9 @@ function togglePanel(forceOpen = null){
   panel.classList.toggle('open', newOpen);
 
   // Accesibilidad + UI
-  if (strip) {
-    strip.setAttribute('aria-expanded', newOpen ? 'true' : 'false');
-  }
+  if (strip) strip.setAttribute('aria-expanded', newOpen ? 'true' : 'false');
   if (caret) caret.textContent = newOpen ? '⬇︎' : '⬆︎';
-  if (btn) {
+  if (btn){
     btn.textContent = newOpen ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
     btn.setAttribute('aria-expanded', String(newOpen));
   }
