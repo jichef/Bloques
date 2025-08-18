@@ -77,72 +77,99 @@ function drawGrid(){
   gridLayer.draw();
 }
 
-// ===== Zonas ancladas al VIEWPORT =====
-let ZONES = null;
-let zoneTenRect=null, zoneHundRect=null; // construcción
-let zoneA=null, zoneB=null, zoneR=null;  // sumas (objetos rectángulo)
-let zoneARect=null, zoneBRect=null, zoneRRect=null; // Konva.Rect visibles
+// ==== ZONAS (construcción y operaciones) ====
 
-const VIEW_M = GRID*3; // margen izq
-const VIEW_T = GRID*3; // margen top
-const GAP_V  = GRID*2; // gap vertical
+// Rectángulos lógicos (datos) y visuales (Konva)
+let ZONES = null;                // objeto con tens/hund (construcción) o A/B/R (operaciones)
+let zoneA=null, zoneB=null, zoneR=null;
+let zoneARect=null, zoneBRect=null, zoneRRect=null;
+let zoneTenRect=null, zoneHundRect=null;
 
-// --- Construcción: Decenas/Centenas
-function computeZonesSumas(){
+const VIEW_M = GRID*3; // margen izquierdo
+const VIEW_T = GRID*3; // margen superior
+const GAP_V  = GRID*2; // separación vertical
+
+// ---------- Construcción: zonas de decenas y centenas ----------
+function computeZonesConstruccion(){
   const v = visibleWorldRect();
-  const bandW = Math.min(v.w - VIEW_M*2, GRID*40);
-  const colW = Math.max(GRID*10, Math.floor(bandW/3) - GRID); // 3 columnas
-  const colH = GRID*12;
+  const tens = { w:10*GRID, h:GRID };
+  const hund = { w:10*GRID, h:10*GRID };
 
-  const baseX = toCell(v.x + VIEW_M);
-  const baseY = toCell(v.y + VIEW_T);
+  const tensX = toCell(v.x + VIEW_M);
+  const tensY = toCell(v.y + VIEW_T);
+  const hundX = tensX;
+  const hundY = toCell(tensY + tens.h + GAP_V);
 
-  const L = LABELS[oper] || LABELS.suma;
-
-  zoneA = { x: baseX + 0*(colW+GRID), y: baseY, w: colW, h: colH, label: L.A };
-  zoneB = { x: baseX + 1*(colW+GRID), y: baseY, w: colW, h: colH, label: L.B };
-  zoneR = { x: baseX + 2*(colW+GRID), y: baseY, w: colW, h: colH, label: L.R };
-
-  ZONES = { A: zoneA, B: zoneB, R: zoneR };
+  ZONES = {
+    tens: { x:tensX, y:tensY, w:tens.w, h:tens.h, label:"Zona Decenas (1×10)" },
+    hund: { x:hundX, y:hundY, w:hund.w, h:hund.h, label:"Zona Centenas (10×10)" }
+  };
 }
+
 function drawZonesConstruccion(){
   uiLayer.destroyChildren();
   const {tens, hund} = ZONES;
-  zoneTenRect  = new Konva.Rect({ x:tens.x,y:tens.y,width:tens.w,height:tens.h, stroke:ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill:ZONE_FILL});
-  const tenLbl = new Konva.Text({ x:tens.x+6, y:tens.y-22, text:tens.label, fontSize:16, fill:ZONE_STROKE});
-  zoneHundRect = new Konva.Rect({ x:hund.x,y:hund.y,width:hund.w,height:hund.h, stroke:ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill:ZONE_FILL});
-  const hunLbl = new Konva.Text({ x:hund.x+6, y:hund.y-22, text:hund.label, fontSize:16, fill:ZONE_STROKE});
+
+  zoneTenRect  = new Konva.Rect({
+    x:tens.x, y:tens.y, width:tens.w, height:tens.h,
+    stroke: ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill: ZONE_FILL
+  });
+  const tenLbl = new Konva.Text({ x:tens.x+6, y:tens.y-22, text:tens.label, fontSize:16, fill: ZONE_STROKE });
+
+  zoneHundRect = new Konva.Rect({
+    x:hund.x, y:hund.y, width:hund.w, height:hund.h,
+    stroke: ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill: ZONE_FILL
+  });
+  const hunLbl = new Konva.Text({ x:hund.x+6, y:hund.y-22, text:hund.label, fontSize:16, fill: ZONE_STROKE });
+
   uiLayer.add(zoneTenRect, tenLbl, zoneHundRect, hunLbl);
   uiLayer.draw();
 }
 
-// --- Sumas: A / B / Resultado
+// ---------- Operaciones (suma/resta): A / B / Resultado ----------
 function computeZonesSumas(){
   const v = visibleWorldRect();
+
+  // banda máx. de 40 celdas de ancho, 3 columnas
   const bandW = Math.min(v.w - VIEW_M*2, GRID*40);
-  const colW = Math.max(GRID*10, Math.floor(bandW/3) - GRID); // 3 columnas
-  const colH = GRID*12;
+  const colW  = Math.max(GRID*10, Math.floor(bandW/3) - GRID);
+  const colH  = GRID*12;
 
   const baseX = toCell(v.x + VIEW_M);
   const baseY = toCell(v.y + VIEW_T);
 
-  zoneA = { x: baseX + 0*(colW+GRID), y: baseY, w: colW, h: colH, label: "Sumando A" };
-  zoneB = { x: baseX + 1*(colW+GRID), y: baseY, w: colW, h: colH, label: "Sumando B" };
+  zoneA = { x: baseX + 0*(colW+GRID), y: baseY, w: colW, h: colH, label: "A" };
+  zoneB = { x: baseX + 1*(colW+GRID), y: baseY, w: colW, h: colH, label: "B" };
   zoneR = { x: baseX + 2*(colW+GRID), y: baseY, w: colW, h: colH, label: "Resultado" };
 
   ZONES = { A: zoneA, B: zoneB, R: zoneR };
 }
+
 function drawZonesSumas(){
   uiLayer.destroyChildren();
 
-  zoneARect = new Konva.Rect({ x:zoneA.x, y:zoneA.y, width:zoneA.w, height:zoneA.h, stroke:ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill:ZONE_FILL, name:'zonaA' });
-  const aLbl = new Konva.Text({ x:zoneA.x+6, y:zoneA.y-22, text:zoneA.label, fontSize:16, fill: ZONE_STROKE });
+  // Etiquetas: si estás en resta, renombra a Minuendo / Sustraendo / Diferencia
+  const enResta = (document.getElementById('sum-info')?.textContent || '').trim().startsWith('Resta:');
 
-  zoneBRect = new Konva.Rect({ x:zoneB.x, y:zoneB.y, width:zoneB.w, height:zoneB.h, stroke:ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill:ZONE_FILL, name:'zonaB' });
-  const bLbl = new Konva.Text({ x:zoneB.x+6, y:zoneB.y-22, text:zoneB.label, fontSize:16, fill: ZONE_STROKE });
+  const labelA = enResta ? 'Minuendo (A)'     : 'Sumando A';
+  const labelB = enResta ? 'Sustraendo (B)'   : 'Sumando B';
+  const labelR = enResta ? 'Diferencia'       : 'Resultado';
 
-  zoneRRect = new Konva.Rect({ x:zoneR.x, y:zoneR.y, width:zoneR.w, height:zoneR.h, stroke:ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill:ZONE_FILL, name:'zonaR' });
-  const rLbl = new Konva.Text({ x:zoneR.x+6, y:zoneR.y-22, text:zoneR.label, fontSize:16, fill: ZONE_STROKE });
+  zoneA.label = labelA;
+  zoneB.label = labelB;
+  zoneR.label = labelR;
+
+  zoneARect = new Konva.Rect({ x:zoneA.x, y:zoneA.y, width:zoneA.w, height:zoneA.h,
+    stroke: ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill: ZONE_FILL, name:'zonaA' });
+  const aLbl = new Konva.Text({ x:zoneA.x+6, y:zoneA.y-22, text:labelA, fontSize:16, fill: ZONE_STROKE });
+
+  zoneBRect = new Konva.Rect({ x:zoneB.x, y:zoneB.y, width:zoneB.w, height:zoneB.h,
+    stroke: ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill: ZONE_FILL, name:'zonaB' });
+  const bLbl = new Konva.Text({ x:zoneB.x+6, y:zoneB.y-22, text:labelB, fontSize:16, fill: ZONE_STROKE });
+
+  zoneRRect = new Konva.Rect({ x:zoneR.x, y:zoneR.y, width:zoneR.w, height:zoneR.h,
+    stroke: ZONE_STROKE, strokeWidth:2, cornerRadius:6, fill: ZONE_FILL, name:'zonaR' });
+  const rLbl = new Konva.Text({ x:zoneR.x+6, y:zoneR.y-22, text:labelR, fontSize:16, fill: ZONE_STROKE });
 
   uiLayer.add(zoneARect, aLbl, zoneBRect, bLbl, zoneRRect, rLbl);
   uiLayer.draw();
