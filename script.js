@@ -1,5 +1,5 @@
-// ===== Bloques — script.js (v17.0.1: Construcción + Sumas, zonas ancladas a viewport, SPAWN visible sin solapes) =====
-console.log("Bloques v17.0.1");
+// ===== Bloques — script.js (v17.1.0: Construcción + Sumas, zonas ancladas al viewport, SPAWN visible sin solapes, TACHADO) =====
+console.log("Bloques v17.1.0");
 
 Konva.pixelRatio = 1;
 
@@ -150,6 +150,39 @@ function overlapsAnyBox(box, skipId=null){
   return false;
 }
 
+// ====== TACHADO ======
+function isStriked(g){ return !!g.getAttr('striked'); }
+
+function updateStrikeVisual(g){
+  g.find('.strike').forEach(n=>n.destroy());
+  if (!isStriked(g)) { g.draw(); return; }
+  const s=typeSize(pieceType(g));
+  const l1 = new Konva.Line({ points:[2,2, s.w-2, s.h-2], stroke:'#cc0000', strokeWidth:3, listening:false, name:'strike' });
+  const l2 = new Konva.Line({ points:[s.w-2,2, 2, s.h-2], stroke:'#cc0000', strokeWidth:3, listening:false, name:'strike' });
+  g.add(l1,l2);
+  g.draw();
+}
+function setStriked(g, val){ g.setAttr('striked', val?1:0); updateStrikeVisual(g); updateStatus(); }
+function toggleStrike(g){ setStriked(g, !isStriked(g)); }
+
+function attachStrikeHandlers(g){
+  // Ctrl / Cmd / Alt + clic → tachar
+  g.on('click', (e)=>{
+    if (e.evt && (e.evt.ctrlKey || e.evt.metaKey || e.evt.altKey)){
+      toggleStrike(g);
+      e.cancelBubble = true;
+    }
+  });
+  // Clic derecho → tachar
+  g.on('contextmenu', (e)=>{
+    e.evt.preventDefault();
+    toggleStrike(g);
+    e.cancelBubble = true;
+  });
+  // Recoloca la X si se movió
+  g.on('dragend', ()=>{ if (isStriked(g)) updateStrikeVisual(g); });
+}
+
 // ===== SPAWN visible sin solapes =====
 const SPAWN = { baseX:0, baseY:0, curX:0, curY:0, rowH:GRID*2, band:{x:0,y:0,w:0,h:0} };
 
@@ -227,7 +260,7 @@ function countAll(){
   const pcs=getPieceGroups(); let u=0,t=0,h=0;
   for (let i=0;i<pcs.length;i++){
     const g = pcs[i];
-    if (isStriked(g)) continue; // ← ignora tachados
+    if (isStriked(g)) continue; // ignora tachados
     const tp=pieceType(g);
     if(tp==='unit')u++; else if(tp==='ten')t++; else if(tp==='hundred')h++;
   }
@@ -311,7 +344,7 @@ function reorderTensZone(){
   if(!zoneTenRect) return;
   const z=ZONES.tens, units=[];
   const arr=childrenGroups();
-  for (let i=0;i<arr.length;i++){ const g=arr[i]; if (pieceType(g)==='unit' && centerInRectBox(boxForGroup(g), ZONES.tens)) units.push(g); }
+  for (let i=0;i<arr.length;i++){ const g=arr[i]; if (pieceType(g)==='unit' && !isStriked(g) && centerInRectBox(boxForGroup(g), ZONES.tens)) units.push(g); }
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   for (let i=0;i<units.length;i++) units[i].position(snap(z.x + Math.min(i,9)*GRID, z.y));
   pieceLayer.batchDraw(); updateStatus();
@@ -323,7 +356,9 @@ function reorderHundredsZone(){
   for (let i=0;i<arr.length;i++){
     const g=arr[i], b=boxForGroup(g);
     if (!centerInRectBox(b, ZONES.hund)) continue;
-    const t=pieceType(g); if(t==='ten') tens.push(g); else if(t==='unit') units.push(g);
+    const t=pieceType(g); 
+    if(t==='ten' && !isStriked(g)) tens.push(g); 
+    else if(t==='unit' && !isStriked(g)) units.push(g);
   }
   tens.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
   units.sort((a,b)=> (a.y()-b.y()) || (a.x()-b.x()));
@@ -340,7 +375,7 @@ function countInRect(zone){
   let u=0,t=0,h=0;
   for (let i=0;i<arr.length;i++){
     const g=arr[i];
-    if (isStriked(g)) continue; // ← ignora tachados
+    if (isStriked(g)) continue; // ignora tachadas
     const b=boxForGroup(g), tp=pieceType(g);
     const inside = (b.x+b.w/2>=zone.x && b.x+b.w/2<=zone.x+zone.w && b.y+b.h/2>=zone.y && b.y+b.h/2<=zone.y+zone.h);
     if (!inside) continue;
@@ -353,6 +388,7 @@ function countInRect(zone){
 
 // ===== Eventos comunes =====
 function onDragEnd(group){
+  // (tachado se gestiona en attachStrikeHandlers)
   group.on('dragend', ()=>{
     group.position(snap(group.x(), group.y()));
     const type = pieceType(group);
@@ -371,66 +407,6 @@ function onDouble(group, cb){
   group.on('pointerdown', ()=>{ const now=Date.now(); if(now-lastTap<300) cb(); lastTap=now; });
   group.on('click',       ()=>{ const now=Date.now(); if(now-lastClick<300) cb(); lastClick=now; });
 }
-// === Tachado (solo se usa en ejercicios de resta) ===
-function isRestaActiva(){
-  // si usas "ejercicio", comprueba que exista y sea resta
-  return (typeof ejercicio !== 'undefined' && ejercicio && ejercicio.tipo === 'resta') && (modo === 'sumas');
-}
-
-function addStrikeOverlay(g){
-  // Dibuja una X por encima de la pieza, sin escuchar eventos
-  const s = typeSize(pieceType(g));
-  const grp = new Konva.Group({ x:0, y:0, name:'strikeOverlay', listening:false });
-  grp.add(new Konva.Line({ points:[0,0, s.w,s.h], stroke:'#cc0000', strokeWidth:3, listening:false }));
-  grp.add(new Konva.Line({ points:[s.w,0, 0,s.h], stroke:'#cc0000', strokeWidth:3, listening:false }));
-  return grp;
-}
-
-function setStriked(g, on){
-  g.setAttr('striked', !!on);
-  // quita overlays previos
-  g.find('.strikeOverlay').forEach(n => n.destroy());
-  if (on){
-    g.add(addStrikeOverlay(g));
-  }
-  pieceLayer.draw();
-}
-
-function isStriked(g){
-  return !!g.getAttr('striked');
-}
-
-function toggleStrike(g){
-  setStriked(g, !isStriked(g));
-}
-
-// Adjunta gestos de tachado a una pieza
-function attachStrikeHandlers(g){
-  // 1) Clic con modificador (Ctrl/Cmd/Alt) o botón secundario → toggle
-  g.on('click', (e)=>{
-    if (!isRestaActiva()) return;
-    if (e.evt.ctrlKey || e.evt.metaKey || e.evt.altKey){
-      toggleStrike(g);
-      e.cancelBubble = true;
-    }
-  });
-  g.on('contextmenu', (e)=>{
-    if (!isRestaActiva()) return;
-    e.evt.preventDefault();
-    toggleStrike(g);
-    e.cancelBubble = true;
-  });
-
-  // 2) Si la pieza cambia de tamaño (p.ej. al descomponer), reponer overlay
-  g.on('dragend', ()=>{
-    if (isStriked(g)){
-      // Recoloca la X a su tamaño actual
-      g.find('.strikeOverlay').forEach(n => n.destroy());
-      g.add(addStrikeOverlay(g));
-      pieceLayer.draw();
-    }
-  });
-}
 
 // ===== Crear piezas (usa SPAWN) =====
 function addChipRectTo(g,w,h,fill){ g.add(new Konva.Rect({x:0,y:0,width:w,height:h,fill,...CHIP_STYLE})); }
@@ -439,19 +415,17 @@ function createUnit(x,y){
   let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'unit' }); g.setAttr('btype','unit'); addChipRectTo(g,w,h,COLORS.unit);
   onDragEnd(g);
-  attachStrikeHandlers(g);              // ← AÑADE ESTO
+  attachStrikeHandlers(g);
   pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
-
 function createTen(x,y){
   const w=10*GRID,h=GRID;
   let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'ten' }); g.setAttr('btype','ten'); addChipRectTo(g,w,h,COLORS.ten);
   onDragEnd(g);
-  attachStrikeHandlers(g);              // ← AÑADE ESTO
+  attachStrikeHandlers(g);
   onDouble(g, ()=>{ 
-    // Si está tachada, no permitir descomponer (opcional)
-    if (isStriked(g)) return;
+    if (isStriked(g)) return; // no descomponer si está tachada
     const start=snap(g.x(),g.y()); 
     g.destroy(); 
     for(let k=0;k<10;k++) createUnit(start.x+k*GRID, start.y); 
@@ -459,16 +433,14 @@ function createTen(x,y){
   });
   pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
-
-
 function createHundred(x,y){
   const w=10*GRID,h=10*GRID;
   let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'hundred' }); g.setAttr('btype','hundred'); addChipRectTo(g,w,h,COLORS.hundred);
-onDragEnd(g);
-  attachStrikeHandlers(g);              // ← AÑADE ESTO
+  onDragEnd(g);
+  attachStrikeHandlers(g);
   onDouble(g, ()=>{ 
-    if (isStriked(g)) return;           // ← evita descomponer si está tachada (opcional)
+    if (isStriked(g)) return;
     const start=snap(g.x(),g.y()); 
     g.destroy(); 
     for(let row=0;row<10;row++) createTen(start.x, start.y+row*GRID); 
@@ -477,90 +449,87 @@ onDragEnd(g);
   pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
 
-// ===== Construcción: composición automática =====
-function composeTensInZone(zone){
-  const units = [];
-  const pcs = childrenGroups();
-  for (let i=0;i<pcs.length;i++){
-    const g=pcs[i];
-    if (pieceType(g)!=='unit') continue;
-    if (isStriked(g)) continue; // 🚫 ignorar unidades tachadas
-    const b=boxForGroup(g);
-    const inside = (b.x+b.w/2>=zone.x && b.x+b.w/2<=zone.x+zone.w &&
-                    b.y+b.h/2>=zone.y && b.y+b.h/2<=zone.y+zone.h);
-    if (inside) units.push(g);
+// ===== Construcción: composición automática (ignorando tachados) =====
+function composeTensInZone(){
+  if(modo!=='construccion' || !ZONES?.tens) return false;
+  let changed=false;
+  // Buscar filas completas de 10 unidades contiguas dentro de la zona
+  const rows=new Map();
+  const arr=childrenGroups();
+  for (let i=0;i<arr.length;i++){
+    const n=arr[i]; if (pieceType(n)!=='unit' || isStriked(n)) continue;
+    const b=boxForGroup(n); if (!centerInRectBox(b, ZONES.tens)) continue;
+    const rowY=toCell(b.y); if(!rows.has(rowY)) rows.set(rowY, new Map());
+    rows.get(rowY).set(toCell(b.x), n);
   }
-  if (units.length>=10){
-    // Tomamos las primeras 10 y destruimos
-    const ten = units.slice(0,10);
-    const pos = { x: zone.x, y: zone.y };
-    for (let i=0;i<ten.length;i++){ ten[i].destroy(); }
-    createTen(pos.x,pos.y);
-    pieceLayer.draw();
-    updateStatus();
-    return true;
+  rows.forEach((mapX,rowY)=>{
+    const xs=[...mapX.keys()].sort((a,b)=>a-b);
+    for(let i=0;i<=xs.length-10;i++){
+      let ok=true; for(let k=0;k<10;k++){ if(!mapX.has(xs[i]+k*GRID)){ ok=false; break; } }
+      if(ok){
+        const nodes=[]; for(let k=0;k<10;k++) nodes.push(mapX.get(xs[i]+k*GRID));
+        nodes.forEach(n=>n.destroy());
+        createTen(xs[i],rowY);
+        changed=true;
+      }
+    }
+  });
+  if(!changed){
+    // fallback: 10 unidades cualesquiera dentro de la zona
+    const pool=[];
+    const arr2=childrenGroups();
+    for (let i=0;i<arr2.length;i++){
+      const n=arr2[i]; if (pieceType(n)!=='unit' || isStriked(n)) continue;
+      if(centerInRectBox(boxForGroup(n), ZONES.tens)) pool.push(n);
+    }
+    if(pool.length>=10){
+      const a=snap(pool[0].x(),pool[0].y());
+      for(let i=0;i<10;i++) pool[i].destroy();
+      createTen(a.x,a.y);
+      changed=true;
+    }
   }
-  return false;
+  if(changed){ reorderTensZone(); pieceLayer.draw(); }
+  return changed;
 }
 
-function composeHundredsInZone(zone){
-  const tens = [];
-  const pcs = childrenGroups();
-  for (let i=0;i<pcs.length;i++){
-    const g=pcs[i];
-    if (pieceType(g)!=='ten') continue;
-    if (isStriked(g)) continue; // 🚫 ignorar decenas tachadas
-    const b=boxForGroup(g);
-    const inside = (b.x+b.w/2>=zone.x && b.x+b.w/2<=zone.x+zone.w &&
-                    b.y+b.h/2>=zone.y && b.y+b.h/2<=zone.y+zone.h);
-    if (inside) tens.push(g);
+function composeHundredsInZone(){
+  if(modo!=='construccion' || !ZONES?.hund) return false;
+  let changed=false;
+
+  // 10u -> 1d
+  while(true){
+    const units=[]; const arr=childrenGroups();
+    for(let i=0;i<arr.length;i++){
+      const n=arr[i]; if(pieceType(n)!=='unit' || isStriked(n)) continue;
+      if(centerInRectBox(boxForGroup(n), ZONES.hund)) units.push(n);
+    }
+    if(units.length<10) break;
+    const a=snap(units[0].x(), units[0].y());
+    for(let i=0;i<10;i++) units[i].destroy();
+    createTen(a.x,a.y); changed=true;
   }
-  if (tens.length>=10){
-    // Tomamos las primeras 10 y destruimos
-    const ten = tens.slice(0,10);
-    const pos = { x: zone.x, y: zone.y };
-    for (let i=0;i<ten.length;i++){ ten[i].destroy(); }
-    createHundred(pos.x,pos.y);
-    pieceLayer.draw();
-    updateStatus();
-    return true;
+
+  // 10d -> 1c
+  while(true){
+    const tens=[]; const arr=childrenGroups();
+    for(let i=0;i<arr.length;i++){
+      const n=arr[i]; if(pieceType(n)!=='ten' || isStriked(n)) continue;
+      if(centerInRectBox(boxForGroup(n), ZONES.hund)) tens.push(n);
+    }
+    if(tens.length<10) break;
+    const a=snap(tens[0].x(), tens[0].y());
+    for(let i=0;i<10;i++) tens[i].destroy();
+    createHundred(a.x,a.y); changed=true;
   }
-  return false;
+
+  if(changed){ reorderHundredsZone(); pieceLayer.draw(); }
+  return changed;
 }
 function checkBuildZones(){
   if (modo!=='construccion'){ updateStatus(); return; }
   let changed; do{ changed=false; if(composeTensInZone()) changed=true; if(composeHundredsInZone()) changed=true; }while(changed);
   reorderTensZone(); reorderHundredsZone(); updateStatus();
-}
-
-// ====== Helpers: crear/injectar UI faltante ======
-function ensureModeButton(){
-  const controls = document.getElementById('controls');
-  if (!controls) return;
-  if (document.getElementById('btn-mode')) return;
-
-  const row = document.createElement('div');
-  row.className = 'row';
-  const btn = document.createElement('button');
-  btn.id = 'btn-mode';
-  btn.textContent = 'Modo: Construcción';
-  btn.addEventListener('click', ()=>{
-    enterMode(modo === 'construccion' ? 'sumas' : 'construccion');
-  });
-  row.appendChild(btn);
-  controls.prepend(row);
-}
-function ensureSumInfo(){
-  if (document.getElementById('sum-info')) return;
-  const controls = document.getElementById('controls');
-  if (!controls) return;
-  const row = document.createElement('div');
-  row.className = 'row';
-  const span = document.createElement('span');
-  span.id = 'sum-info';
-  span.style.display = 'none';
-  row.appendChild(span);
-  controls.appendChild(row);
 }
 
 // ====== Helpers UI de modo ======
@@ -609,7 +578,6 @@ function setUIForMode(){
   updateStatus();
 }
 
-
 function enterMode(m){
   modo = (m === 'sumas') ? 'sumas' : 'construccion';
   uiLayer.destroyChildren();
@@ -652,7 +620,7 @@ function newSub(a=null, b=null){
   const info = document.getElementById('sum-info');
   if (info){
     info.style.display = 'inline';
-    info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “Minuendo (A)”, ${b} en “Sustraendo (B)” y deja el total en “Resultado”.`;
+    info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “Minuendo (A)”, ${b} en “Sustraendo (B)” y deja el resultado en “Resultado”.`;
   }
 
   computeZonesSumas(); 
@@ -662,15 +630,11 @@ function newSub(a=null, b=null){
   try{ speak(`Nueva resta: ${a} menos ${b}`);}catch{}
 }
 
-// ====== Wire UI ======
-function bindAny(ids, handler){
-  ids.forEach(id=>{
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('click', handler);
-  });
-}
-function // Evita menú contextual por defecto para usar el clic derecho como “tachar”
-document.getElementById('container')?.addEventListener('contextmenu', e=> e.preventDefault());
+// ====== Wire UI (delegación) ======
+function wireUI(){
+  // Evita menú contextual por defecto en el canvas para usar clic derecho como “tachar”
+  document.getElementById('container')?.addEventListener('contextmenu', e=> e.preventDefault());
+
   const $ = id => document.getElementById(id);
   const controls = $('controls');
   if (!controls) { console.error('❌ #controls no encontrado'); return; }
@@ -680,9 +644,7 @@ document.getElementById('container')?.addEventListener('contextmenu', e=> e.prev
     const btn = e.target.closest('button');
     if (!btn || !controls.contains(btn)) return;
 
-    const id = btn.id;
-
-    switch(id){
+    switch(btn.id){
 
       // Cambio de modo
       case 'btn-mode-construccion':
@@ -696,44 +658,22 @@ document.getElementById('container')?.addEventListener('contextmenu', e=> e.prev
         break;
 
       // Crear piezas
-      case 'btn-unit':
-        createUnit();
-        break;
-
-      case 'btn-ten':
-        createTen();
-        break;
-
-      case 'btn-hundred':
-        createHundred();
-        break;
+      case 'btn-unit':    createUnit();    break;
+      case 'btn-ten':     createTen();     break;
+      case 'btn-hundred': createHundred(); break;
 
       // Generadores (solo visibles en modo sumas por setUIForMode)
-      case 'btn-new-sum':
-        newSum();
-        break;
-
-      case 'btn-new-sub':
-        newSub();
-        break;
+      case 'btn-new-sum': newSum(); break;
+      case 'btn-new-sub': newSub(); break;
 
       // Limpiar
       case 'btn-clear':
-        pieceLayer.destroyChildren();
-        pieceLayer.draw();
-        updateStatus();
-        resetSpawnBase();
+        pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase();
         break;
 
       // Zoom
-      case 'btn-zoom-in':
-        zoomStep(+1);
-        break;
-
-      case 'btn-zoom-out':
-        zoomStep(-1);
-        break;
-
+      case 'btn-zoom-in':    zoomStep(+1); break;
+      case 'btn-zoom-out':   zoomStep(-1); break;
       case 'btn-reset-view':
         world.scale = 1;
         world.x = stage.width()/2  - WORLD_W/2;
@@ -741,8 +681,7 @@ document.getElementById('container')?.addEventListener('contextmenu', e=> e.prev
         applyWorldTransform();
         if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); }
         else                      { computeZonesSumas();       drawZonesSumas();       }
-        resetSpawnBase();
-        updateStatus();
+        resetSpawnBase(); updateStatus();
         break;
 
       // Reto clásico (se oculta en modo sumas por setUIForMode)
@@ -761,10 +700,6 @@ document.getElementById('container')?.addEventListener('contextmenu', e=> e.prev
           if (total===0) return;
           hablarDescompYLetras(hundreds,tens,units,total,1100);
         }
-        break;
-
-      default:
-        // Botón no gestionado aquí
         break;
     }
   });
@@ -803,16 +738,10 @@ stage.on('mousemove touchmove', ()=>{
   world.y += dy;
   applyWorldTransform();
   lastPointerPos = pos;
-
-  // ⚠️ No recalculamos zonas aquí: así se mueven con el mundo
-  // Solo, si quieres, refrescamos la banda de spawn para que aparezca a la vista
-  resetSpawnBase();
+  resetSpawnBase(); // mantener SPAWN visible
 });
 
-stage.on('mouseup touchend', ()=>{
-  isPanning=false;
-  lastPointerPos=null;
-});
+stage.on('mouseup touchend', ()=>{ isPanning=false; lastPointerPos=null; });
 
 stage.on('wheel', (e)=>{
   e.evt.preventDefault();
@@ -825,8 +754,6 @@ stage.on('wheel', (e)=>{
   world.x = p.x - m.x*s;
   world.y = p.y - m.y*s;
   applyWorldTransform();
-
-  // ⚠️ Tampoco recalculamos zonas aquí
   resetSpawnBase();
 });
 
@@ -839,8 +766,6 @@ stage.on('dblclick dbltap', ()=>{
   world.x = p.x - m.x*s;
   world.y = p.y - m.y*s;
   applyWorldTransform();
-
-  // ⚠️ Tampoco recalculamos zonas aquí
   resetSpawnBase();
 });
 
@@ -855,7 +780,7 @@ function startIntro(){
   applyWorldTransform();
 
   let i=0; const timer=setInterval(()=>{
-    i++; const t=i/steps, s=start + (end-start)*t;
+    i++; const s=start + (end-start)*(i/steps);
     zoomAt({x:stage.width()/2,y:stage.height()/2}, s);
     if(i>=steps){ clearInterval(timer);
       if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); } else { computeZonesSumas(); drawZonesSumas(); }
