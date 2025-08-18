@@ -471,65 +471,42 @@ function ensureSumInfo(){
 }
 
 // ====== Helpers UI de modo ======
-// ====== Helpers UI de modo ======
+// --- setUIForMode (reemplaza la tuya) ---
 function setUIForMode(){
-  // Asegura el contenedor del enunciado (si usas ensureSumInfo, déjalo)
-  if (!document.getElementById('sum-info')) {
-    const controls = document.getElementById('controls');
-    if (controls){
-      const row = document.createElement('div');
-      row.className = 'row';
-      const span = document.createElement('span');
-      span.id = 'sum-info';
-      span.style.display = 'none';
-      span.style.marginLeft = '12px';
-      row.appendChild(span);
-      controls.appendChild(row);
-    }
-  }
-
   const btnChallenge = document.getElementById('btn-challenge');
   const challengeTxt = document.getElementById('challenge');
   const sumInfo      = document.getElementById('sum-info');
-
-  // ✅ IDs correctos según tu HTML
-  const btnSum       = document.getElementById('btn-new-sum');
+  const btnSum       = document.getElementById('btn-new-sum'); // <-- IDs de tu HTML
   const btnSub       = document.getElementById('btn-new-sub');
 
   if (modo === 'construccion'){
-    // Reto visible
     if (btnChallenge) btnChallenge.style.display = 'inline-block';
     if (challengeTxt) challengeTxt.style.display = 'inline';
 
-    // Enunciado y generadores ocultos
     if (sumInfo){ sumInfo.style.display = 'none'; sumInfo.textContent = ''; }
     if (btnSum)  btnSum.style.display  = 'none';
     if (btnSub)  btnSub.style.display  = 'none';
 
-    computeZonesConstruccion();
-    drawZonesConstruccion();
-
-  } else { // 'sumas'
-    // Ocultar reto
+    computeZonesConstruccion(); drawZonesConstruccion();
+  } else {
     if (btnChallenge) btnChallenge.style.display = 'none';
     if (challengeTxt){ challengeTxt.style.display = 'none'; challengeTxt.textContent = ''; }
 
-    // Mostrar enunciado y generadores
     if (sumInfo) sumInfo.style.display = 'inline';
     if (btnSum)  btnSum.style.display  = 'inline-block';
     if (btnSub)  btnSub.style.display  = 'inline-block';
 
-    computeZonesSumas();
-    drawZonesSumas();
+    computeZonesSumas(); drawZonesSumas();
   }
 
   resetSpawnBase();
   updateStatus();
 
-  // Si usas el botón toggle "Modo: …" inyectado
   const btnMode = document.getElementById('btn-mode');
   if (btnMode) btnMode.textContent = 'Modo: ' + (modo === 'construccion' ? 'Construcción' : 'Sumas');
 }
+
+
 function enterMode(m){
   modo = (m === 'sumas') ? 'sumas' : 'construccion';
   uiLayer.destroyChildren();
@@ -578,54 +555,36 @@ function bindAny(ids, handler){
     if (el) el.addEventListener('click', handler);
   });
 }
-// ====== Wire UI ======
+// --- wireUI (reemplaza la tuya) ---
 function wireUI(){
   const $ = id => document.getElementById(id);
 
-  // (opcional) botón toggle “Modo: …” inyectado por código
-  if (!$('#btn-mode')){
-    const controls = $('#controls');
-    if (controls){
-      const row = document.createElement('div');
-      row.className = 'row';
-      const btn = document.createElement('button');
-      btn.id = 'btn-mode';
-      btn.textContent = 'Modo: Construcción';
-      btn.addEventListener('click', ()=> enterMode(modo === 'construccion' ? 'sumas' : 'construccion'));
-      row.appendChild(btn);
-      controls.prepend(row);
-    }
-  }
-
-  // Botones de modo explícitos (si existen en tu HTML)
-  $('#btn-mode-construccion')?.addEventListener('click', enterConstruccionMode);
-  $('#btn-mode-suma')?.addEventListener('click', enterSumasMode);
+  // Botones de modo explícitos (los que tienes en el HTML)
+  $('#btn-mode-construccion')?.addEventListener('click', ()=> enterMode('construccion'));
+  $('#btn-mode-suma')?.addEventListener('click', ()=> enterMode('sumas'));
 
   // Crear piezas
   $('#btn-unit')   ?.addEventListener('click', ()=> createUnit());
   $('#btn-ten')    ?.addEventListener('click', ()=> createTen());
   $('#btn-hundred')?.addEventListener('click', ()=> createHundred());
 
-  // ✅ Generadores — IDs correctos
+  // Generadores (IDs correctos en tu HTML)
   $('#btn-new-sum')?.addEventListener('click', ()=> newSum());
   $('#btn-new-sub')?.addEventListener('click', ()=> newSub());
 
   // Limpiar
   $('#btn-clear')?.addEventListener('click', ()=>{
-    pieceLayer.destroyChildren();
-    pieceLayer.draw();
-    updateStatus();
-    resetSpawnBase();
+    pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase();
   });
 
   // Voz
   $('#btn-say')?.addEventListener('click', ()=>{
     const {units,tens,hundreds,total}=countAll();
-    if (total===0) return;
+    if(total===0) return;
     hablarDescompYLetras(hundreds,tens,units,total,1100);
   });
 
-  // Reto (se oculta en modo sumas dentro de setUIForMode)
+  // Reto
   $('#btn-challenge')?.addEventListener('click', ()=>{
     if (modo!=='construccion') return;
     challengeNumber = Math.floor(Math.random()*900)+1;
@@ -636,10 +595,10 @@ function wireUI(){
 
   // Panel
   $('#panel-toggle')?.addEventListener('click', ()=>{
-    const panel = $('#panel');
-    const open = panel.classList.toggle('open');
-    const btn = $('#panel-toggle');
-    btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
+    const panel=$('#panel');
+    const open=panel.classList.toggle('open');
+    const btn=$('#panel-toggle');
+    btn.textContent=open?'⬇︎ Ocultar detalles':'⬆︎ Detalles';
     btn.setAttribute('aria-expanded', String(open));
     panel.setAttribute('aria-hidden', String(!open));
   });
@@ -663,8 +622,19 @@ function wireUI(){
     updateStatus();
   });
 
-  // Estado visual inicial
+  // Comenzar con el modo actual
   setUIForMode();
+
+  // 👀 Diagnóstico: ver qué botones se encontraron
+  console.table({
+    btn_unit: !!$('#btn-unit'),
+    btn_ten: !!$('#btn-ten'),
+    btn_hundred: !!$('#btn-hundred'),
+    btn_new_sum: !!$('#btn-new-sum'),
+    btn_new_sub: !!$('#btn-new-sub'),
+    btn_mode_construccion: !!$('#btn-mode-construccion'),
+    btn_mode_suma: !!$('#btn-mode-suma'),
+  });
 }
 
 // Pan & zoom
