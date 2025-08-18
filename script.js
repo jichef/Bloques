@@ -661,26 +661,62 @@ function wireUI(){
 
 // Pan & zoom
 let isPanning=false, lastPointerPos=null;
-stage.on('mousedown touchstart', (e)=>{ if(e.target && e.target.getLayer && e.target.getLayer()===pieceLayer) return; isPanning=true; lastPointerPos=stage.getPointerPosition(); });
+
+stage.on('mousedown touchstart', (e)=>{
+  // activa pan si haces down sobre cualquier capa que no sea pieceLayer
+  if (e.target && e.target.getLayer && e.target.getLayer() === pieceLayer) return;
+  isPanning = true;
+  lastPointerPos = stage.getPointerPosition();
+});
+
 stage.on('mousemove touchmove', ()=>{
-  if(!isPanning) return; const pos=stage.getPointerPosition(); if(!pos||!lastPointerPos) return;
-  const dx=pos.x-lastPointerPos.x, dy=pos.y-lastPointerPos.y; world.x+=dx; world.y+=dy; applyWorldTransform(); lastPointerPos=pos;
-  if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); } else { computeZonesSumas(); drawZonesSumas(); }
+  if(!isPanning) return;
+  const pos = stage.getPointerPosition();
+  if(!pos || !lastPointerPos) return;
+  const dx = pos.x - lastPointerPos.x;
+  const dy = pos.y - lastPointerPos.y;
+  world.x += dx;
+  world.y += dy;
+  applyWorldTransform();
+  lastPointerPos = pos;
+
+  // ⚠️ No recalculamos zonas aquí: así se mueven con el mundo
+  // Solo, si quieres, refrescamos la banda de spawn para que aparezca a la vista
   resetSpawnBase();
 });
-stage.on('mouseup touchend', ()=>{ isPanning=false; lastPointerPos=null; });
+
+stage.on('mouseup touchend', ()=>{
+  isPanning=false;
+  lastPointerPos=null;
+});
+
 stage.on('wheel', (e)=>{
   e.evt.preventDefault();
-  const old=world.scale, p=stage.getPointerPosition(), m={x:(p.x-world.x)/old,y:(p.y-world.y)/old};
-  let s=e.evt.deltaY>0?old/SCALE_BY:old*SCALE_BY; s=Math.max(SCALE_MIN,Math.min(SCALE_MAX,s));
-  world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform();
-  if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); } else { computeZonesSumas(); drawZonesSumas(); }
+  const old = world.scale;
+  const p = stage.getPointerPosition();
+  const m = { x:(p.x-world.x)/old, y:(p.y-world.y)/old };
+  let s = e.evt.deltaY > 0 ? old/SCALE_BY : old*SCALE_BY;
+  s = Math.max(SCALE_MIN, Math.min(SCALE_MAX, s));
+  world.scale = s;
+  world.x = p.x - m.x*s;
+  world.y = p.y - m.y*s;
+  applyWorldTransform();
+
+  // ⚠️ Tampoco recalculamos zonas aquí
   resetSpawnBase();
 });
+
 stage.on('dblclick dbltap', ()=>{
-  const p=stage.getPointerPosition(), old=world.scale, m={x:(p.x-world.x)/old,y:(p.y-world.y)/old};
-  let s=Math.min(SCALE_MAX, old*1.25); world.scale=s; world.x=p.x-m.x*s; world.y=p.y-m.y*s; applyWorldTransform();
-  if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); } else { computeZonesSumas(); drawZonesSumas(); }
+  const p = stage.getPointerPosition();
+  const old = world.scale;
+  const m = { x:(p.x-world.x)/old, y:(p.y-world.y)/old };
+  let s = Math.min(SCALE_MAX, old*1.25);
+  world.scale = s;
+  world.x = p.x - m.x*s;
+  world.y = p.y - m.y*s;
+  applyWorldTransform();
+
+  // ⚠️ Tampoco recalculamos zonas aquí
   resetSpawnBase();
 });
 
