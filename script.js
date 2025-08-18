@@ -12,10 +12,15 @@ const CHIP_STYLE = {
   shadowColor:"rgba(0,0,0,0.4)", shadowBlur:6, shadowOffsetX:3, shadowOffsetY:3, shadowOpacity:0.25
 };
 // === Dificultad del reto ===
+// === Dificultad del reto (construcción) ===
 const DIFFICULTY_LEVELS = { inicial: 10, medio: 100, avanzado: 999 };
 let currentDifficulty = (localStorage.getItem('bloques.difficulty') || 'inicial');
 if (!DIFFICULTY_LEVELS[currentDifficulty]) currentDifficulty = 'inicial';
 
+// === Dificultad de sumas/restas ===
+const SUM_DIFFICULTY_LEVELS = { basico: 9, avanzado: 99, experto: 999 };
+let currentSumDifficulty = (localStorage.getItem('bloques.sumDifficulty') || 'basico');
+if (!SUM_DIFFICULTY_LEVELS[currentSumDifficulty]) currentSumDifficulty = 'basico';
 // Mundo
 const WORLD_COLS = 160, WORLD_ROWS = 120;
 const WORLD_W = WORLD_COLS*GRID, WORLD_H = WORLD_ROWS*GRID;
@@ -215,7 +220,31 @@ function setPanelOpen(open){
   if (typeof sizeStageToContainer === 'function') sizeStageToContainer();
 }
 
+function setSumDifficulty(level){
+  if (!SUM_DIFFICULTY_LEVELS[level]) return;
+  currentSumDifficulty = level;
+  try { localStorage.setItem('bloques.sumDifficulty', level); } catch {}
+  renderSumDifficultyUI();
+}
 
+function renderSumDifficultyUI(){
+  const map = {
+    basico:   document.getElementById('btn-sumdiff-basico'),
+    avanzado: document.getElementById('btn-sumdiff-avanzado'),
+    experto:  document.getElementById('btn-sumdiff-experto')
+  };
+  Object.entries(map).forEach(([lvl,btn])=>{
+    if (!btn) return;
+    btn.classList.toggle('active', lvl === currentSumDifficulty);
+  });
+
+  const ind = document.getElementById('sumdiff-indicator');
+  if (ind){
+    const max = SUM_DIFFICULTY_LEVELS[currentSumDifficulty];
+    const label = currentSumDifficulty[0].toUpperCase()+currentSumDifficulty.slice(1);
+    ind.textContent = `Nivel sumas: ${label} (0–${max})`;
+  }
+}
 
 
 // ====== TACHADO ======
@@ -857,15 +886,17 @@ function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
 function newSum(a=null, b=null){
   oper = 'suma';
   if (modo!=='sumas') enterMode('sumas');
-  if (a===null) a = randInt(10, 99);
-  if (b===null) b = randInt(10, 99);
+
+  const max = SUM_DIFFICULTY_LEVELS[currentSumDifficulty] || 9;
+  if (a===null) a = randInt(0, max);
+  if (b===null) b = randInt(0, max);
 
   pieceLayer.destroyChildren(); pieceLayer.draw();
 
   const info = document.getElementById('sum-info');
   if (info){
     info.style.display = 'inline';
-    info.textContent = `Suma: ${a} + ${b}. Construye ${a} en “${LABELS.suma.A} (A)”, ${b} en “${LABELS.suma.B} (B)” y deja el total en “${LABELS.suma.R}”.`;
+    info.textContent = `Suma (${currentSumDifficulty}): ${a} + ${b}. Construye ${a} en “${LABELS.suma.A} (A)”, ${b} en “${LABELS.suma.B} (B)” y deja el total en “${LABELS.suma.R}”.`;
   }
 
   computeZonesSumas(); 
@@ -878,8 +909,11 @@ function newSum(a=null, b=null){
 function newSub(a=null, b=null){
   oper = 'resta';
   if (modo!=='sumas') enterMode('sumas');
-  if (a===null) a = randInt(20, 99);
-  if (b===null) b = randInt(10, a);
+
+  const max = SUM_DIFFICULTY_LEVELS[currentSumDifficulty] || 9;
+  if (a===null) a = randInt(0, max);
+  if (b===null) b = randInt(0, a);
+
   if (b>a) [a,b] = [b,a]; // garantizamos A ≥ B
 
   pieceLayer.destroyChildren(); pieceLayer.draw();
@@ -887,7 +921,7 @@ function newSub(a=null, b=null){
   const info = document.getElementById('sum-info');
   if (info){
     info.style.display = 'inline';
-    info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “${LABELS.resta.A} (A)”, ${b} en “${LABELS.resta.B} (B)” y deja el resultado en “${LABELS.resta.R}”.`;
+    info.textContent = `Resta (${currentSumDifficulty}): ${a} − ${b}. Construye ${a} en “${LABELS.resta.A} (A)”, ${b} en “${LABELS.resta.B} (B)” y deja el resultado en “${LABELS.resta.R}”.`;
   }
 
   computeZonesSumas(); 
@@ -896,7 +930,6 @@ function newSub(a=null, b=null){
   updateStatus();
   try{ speak(`Nueva resta: ${a} menos ${b}`);}catch{}
 }
-
 
 // === Asegurar mini-resumen visible en la barra ===
 function ensureMiniStatus(){
