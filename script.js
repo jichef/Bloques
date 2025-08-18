@@ -38,7 +38,14 @@ function applyWorldTransform(){
 
 // ---- MODO ----
 let modo = 'construccion';    // 'construccion' | 'sumas'
+// ---- OPERACIÓN ACTUAL EN EL MODO "sumas" ----
+// 'suma' | 'resta'
+let oper = 'suma';
 
+const LABELS = {
+  suma:  { A: 'Sumando',   B: 'Sumando',    R: 'Resultado'   },
+  resta: { A: 'Minuendo',  B: 'Sustraendo', R: 'Diferencia'  }
+};
 // Utils
 const toCell = n => Math.round(n/GRID)*GRID;
 const snap   = (x,y)=>({x:toCell(x), y:toCell(y)});
@@ -81,20 +88,22 @@ const VIEW_T = GRID*3; // margen top
 const GAP_V  = GRID*2; // gap vertical
 
 // --- Construcción: Decenas/Centenas
-function computeZonesConstruccion(){
+function computeZonesSumas(){
   const v = visibleWorldRect();
-  const tens = { w:10*GRID, h:GRID };
-  const hund = { w:10*GRID, h:10*GRID };
+  const bandW = Math.min(v.w - VIEW_M*2, GRID*40);
+  const colW = Math.max(GRID*10, Math.floor(bandW/3) - GRID); // 3 columnas
+  const colH = GRID*12;
 
-  const tensX = toCell(v.x + VIEW_M);
-  const tensY = toCell(v.y + VIEW_T);
-  const hundX = tensX;
-  const hundY = toCell(tensY + tens.h + GAP_V);
+  const baseX = toCell(v.x + VIEW_M);
+  const baseY = toCell(v.y + VIEW_T);
 
-  ZONES = {
-    tens: { x:tensX, y:tensY, w:tens.w, h:tens.h, label:"Zona Decenas (1×10)" },
-    hund: { x:hundX, y:hundY, w:hund.w, h:hund.h, label:"Zona Centenas (10×10)" }
-  };
+  const L = LABELS[oper] || LABELS.suma;
+
+  zoneA = { x: baseX + 0*(colW+GRID), y: baseY, w: colW, h: colH, label: L.A };
+  zoneB = { x: baseX + 1*(colW+GRID), y: baseY, w: colW, h: colH, label: L.B };
+  zoneR = { x: baseX + 2*(colW+GRID), y: baseY, w: colW, h: colH, label: L.R };
+
+  ZONES = { A: zoneA, B: zoneB, R: zoneR };
 }
 function drawZonesConstruccion(){
   uiLayer.destroyChildren();
@@ -338,7 +347,7 @@ function hablarDescompYLetras(h,t,u,total,pausa=1000){
 }
 
 let challengeNumber=null;
-function updateStatus(){
+  function updateStatus(){
   if (modo === 'construccion'){
     const {units,tens,hundreds,total}=countAll();
     const enLetras=numEnLetras(total);
@@ -369,44 +378,64 @@ function updateStatus(){
     return;
   }
 
-  // Sumas
+  // ===== MODO SUMAS/RESTAS =====
   const a = countInRect(zoneA);
   const b = countInRect(zoneB);
   const r = countInRect(zoneR);
 
-  const st=document.getElementById('status');
-  if(st) st.textContent = `A: ${a.total}  +  B: ${b.total}  =  Resultado: ${r.total}`;
+  const isResta = (oper === 'resta');
+  const L = (typeof LABELS !== 'undefined' && LABELS[oper]) ? LABELS[oper] : {A:'A',B:'B',R:'Resultado'};
 
+  // Línea de estado grande
+  const st=document.getElementById('status');
+  if(st) st.textContent = isResta
+    ? `${L.A}: ${a.total}  −  ${L.B}: ${b.total}  =  ${L.R}: ${r.total}`
+    : `${L.A}: ${a.total}  +  ${L.B}: ${b.total}  =  ${L.R}: ${r.total}`;
+
+  // Desglose en el panel
   const bd=document.getElementById('breakdown');
   if (bd){
-    bd.innerHTML = `
-      <div class="label">A (c=×100,d=×10,u=×1)</div><div class="value">${a.hundreds}c, ${a.tens}d, ${a.units}u → ${a.total}</div>
-      <div class="label">B (c=×100,d=×10,u=×1)</div><div class="value">${b.hundreds}c, ${b.tens}d, ${b.units}u → ${b.total}</div>
-      <div class="label">A+B</div><div class="value">${a.total + b.total}</div>
-      <div class="label">Resultado</div><div class="value">${r.total}</div>
-    `;
+    bd.innerHTML = isResta
+      ? `
+        <div class="label">${L.A} (c=×100,d=×10,u=×1)</div><div class="value">${a.hundreds}c, ${a.tens}d, ${a.units}u → ${a.total}</div>
+        <div class="label">${L.B} (c=×100,d=×10,u=×1)</div><div class="value">${b.hundreds}c, ${b.tens}d, ${b.units}u → ${b.total}</div>
+        <div class="label">A−B</div><div class="value">${a.total - b.total}</div>
+        <div class="label">${L.R}</div><div class="value">${r.total}</div>
+      `
+      : `
+        <div class="label">${L.A} (c=×100,d=×10,u=×1)</div><div class="value">${a.hundreds}c, ${a.tens}d, ${a.units}u → ${a.total}</div>
+        <div class="label">${L.B} (c=×100,d=×10,u=×1)</div><div class="value">${b.hundreds}c, ${b.tens}d, ${b.units}u → ${b.total}</div>
+        <div class="label">A+B</div><div class="value">${a.total + b.total}</div>
+        <div class="label">${L.R}</div><div class="value">${r.total}</div>
+      `;
   }
 
   // Mini‑resumen (arriba)
   setMiniStatus(
-    `A=${a.total}  B=${b.total}  R=${r.total}  |  ` +
+    `${isResta ? 'A−B' : 'A+B'}  |  A=${a.total}  B=${b.total}  ${L.R}=${r.total}  ·  ` +
     `A: ${a.hundreds}c-${a.tens}d-${a.units}u · ` +
     `B: ${b.hundreds}c-${b.tens}d-${b.units}u`
   );
 
   // Franja fija (abajo)
   setDetailsStrip(
-    `Sumas — A: ${a.hundreds}c ${a.tens}d ${a.units}u (=${a.total})  ·  ` +
-    `B: ${b.hundreds}c ${b.tens}d ${b.units}u (=${b.total})  ·  ` +
-    `R: ${r.hundreds}c ${r.tens}d ${r.units}u (=${r.total})`
+    `${isResta ? 'Restas' : 'Sumas'} — ` +
+    `${L.A}: ${a.hundreds}c ${a.tens}d ${a.units}u (=${a.total})  ·  ` +
+    `${L.B}: ${b.hundreds}c ${b.tens}d ${b.units}u (=${b.total})  ·  ` +
+    `${L.R}: ${r.hundreds}c ${r.tens}d ${r.units}u (=${r.total})`
   );
 
+  // Mensaje guía/reto
   const ch = document.getElementById('challenge');
   if (ch){
-    if (r.total === a.total + b.total && (a.total>0 || b.total>0)){
-      ch.textContent = `🎉 ¡Perfecto! ${a.total} + ${b.total} = ${r.total}`;
-    }else{
-      ch.textContent = `➕ Construye: A + B = Resultado`;
+    if (!isResta){
+      if (r.total === a.total + b.total && (a.total>0 || b.total>0)){
+        ch.textContent = `🎉 ¡Perfecto! ${a.total} + ${b.total} = ${r.total}`;
+      } else {
+        ch.textContent = `➕ Construye: A + B = ${L.R}`;
+      }
+    } else {
+      ch.textContent = `➖ Construye: A − B = ${L.R}`;
     }
   }
 }
@@ -730,6 +759,7 @@ function enterSumasMode(){ enterMode('sumas'); }
 // ====== Generadores de ejercicios ======
 function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
 function newSum(a=null, b=null){
+  oper = 'suma';
   if (modo!=='sumas') enterMode('sumas');
   if (a===null) a = randInt(10, 99);
   if (b===null) b = randInt(10, 99);
@@ -739,7 +769,7 @@ function newSum(a=null, b=null){
   const info = document.getElementById('sum-info');
   if (info){
     info.style.display = 'inline';
-    info.textContent = `Suma: ${a} + ${b}. Construye ${a} en “Sumando A”, ${b} en “Sumando B” y deja el total en “Resultado”.`;
+    info.textContent = `Suma: ${a} + ${b}. Construye ${a} en “${LABELS.suma.A} (A)”, ${b} en “${LABELS.suma.B} (B)” y deja el total en “${LABELS.suma.R}”.`;
   }
 
   computeZonesSumas(); 
@@ -748,18 +778,20 @@ function newSum(a=null, b=null){
   updateStatus();
   try{ speak(`Nueva suma: ${a} más ${b}`);}catch{}
 }
+
 function newSub(a=null, b=null){
+  oper = 'resta';
   if (modo!=='sumas') enterMode('sumas');
   if (a===null) a = randInt(20, 99);
   if (b===null) b = randInt(10, a);
-  if (b>a) [a,b] = [b,a];
+  if (b>a) [a,b] = [b,a]; // garantizamos A ≥ B
 
   pieceLayer.destroyChildren(); pieceLayer.draw();
 
   const info = document.getElementById('sum-info');
   if (info){
     info.style.display = 'inline';
-    info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “Minuendo (A)”, ${b} en “Sustraendo (B)” y deja el resultado en “Resultado”.`;
+    info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “${LABELS.resta.A} (A)”, ${b} en “${LABELS.resta.B} (B)” y deja el resultado en “${LABELS.resta.R}”.`;
   }
 
   computeZonesSumas(); 
@@ -768,6 +800,7 @@ function newSub(a=null, b=null){
   updateStatus();
   try{ speak(`Nueva resta: ${a} menos ${b}`);}catch{}
 }
+
 
 // === Asegurar mini-resumen visible en la barra ===
 function ensureMiniStatus(){
