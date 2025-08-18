@@ -50,7 +50,7 @@ let modo = 'construccion';    // 'construccion' | 'sumas'
 // ---- OPERACIÓN ACTUAL EN EL MODO "sumas" ----
 // 'suma' | 'resta'
 let oper = 'suma';
-
+let currentOp = null; // {type:'suma'|'resta', a:number, b:number}
 const LABELS = {
   suma:  { A: 'Sumando',   B: 'Sumando',    R: 'Resultado'   },
   resta: { A: 'Minuendo',  B: 'Sustraendo', R: 'Diferencia'  }
@@ -245,6 +245,7 @@ function renderSumDifficultyUI(){
     ind.textContent = `Nivel sumas: ${label} (0–${max})`;
   }
 }
+const cduToNum = o => (o.hundreds*100 + o.tens*10 + o.units);
 
 // ¿Hay alguna llevada en la suma por columnas?
 function hasCarry(a, b){
@@ -836,14 +837,52 @@ function resaltarZonaResultado(ok){
   setTimeout(()=>{ halo.visible(false); uiLayer.batchDraw(); }, 2200);
 }
 function corregirActual(){
-  if (modo!=='sumas'){ mostrarErrores(['Cambia a modo sumas para corregir.']); return false; }
-  const a = countInRect(zoneA);
-  const b = countInRect(zoneB);
-  const r = countInRect(zoneR);
-  const {correcto, errores} = comprobarSumaPasoAPaso(a,b,r);
-  resaltarZonaResultado(correcto);
+  if (modo!=='sumas'){ 
+    mostrarErrores(['Cambia a modo sumas para corregir.']); 
+    return false; 
+  }
+
+  const aZ = countInRect(zoneA);
+  const bZ = countInRect(zoneB);
+  const rZ = countInRect(zoneR);
+
+  const aNum = cduToNum(aZ);
+  const bNum = cduToNum(bZ);
+  const rNum = cduToNum(rZ);
+
+  const errores = [];
+
+  if (currentOp){
+    if (currentOp.type === 'suma'){
+      if (aNum !== currentOp.a) errores.push(`En A debes construir ${currentOp.a}, no ${aNum}.`);
+      if (bNum !== currentOp.b) errores.push(`En B debes construir ${currentOp.b}, no ${bNum}.`);
+      if (rNum !== aNum + bNum) errores.push(`El resultado debería ser ${aNum + bNum}, no ${rNum}.`);
+      // Si A y B son correctos, da feedback de acarreo a nivel CDU
+      if (errores.length === 0){
+        const paso = comprobarSumaPasoAPaso(aZ, bZ, rZ);
+        if (!paso.correcto) errores.push(...paso.errores);
+      }
+    } else { // resta
+      if (aNum !== currentOp.a) errores.push(`En A debes construir ${currentOp.a}, no ${aNum}.`);
+      if (bNum !== currentOp.b) errores.push(`En B debes construir ${currentOp.b}, no ${bNum}.`);
+      if (rNum !== aNum - bNum) errores.push(`El resultado debería ser ${aNum - bNum}, no ${rNum}.`);
+      // (Opcional: podrías implementar comprobación paso a paso con préstamos)
+    }
+  } else {
+    // Sin ejercicio activo: retrocompatibilidad (solo chequeo de coherencia entre zonas)
+    if (oper === 'suma'){
+      const paso = comprobarSumaPasoAPaso(aZ, bZ, rZ);
+      if (!paso.correcto) errores.push(...paso.errores);
+    } else {
+      // Resta sin ejercicio activo: chequeo básico
+      if (rNum !== aNum - bNum) errores.push(`El resultado debería ser ${aNum - bNum}, no ${rNum}.`);
+    }
+  }
+
+  const ok = errores.length === 0;
+  resaltarZonaResultado(ok);
   mostrarErrores(errores);
-  return correcto;
+  return ok;
 }
 
 // ====== Helpers UI de modo ======
@@ -978,25 +1017,21 @@ function updateControlsVisibility(){
 }
 // ====== Generadores de ejercicios ======
 function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
 function newSum(a=null, b=null){
   oper = 'suma';
   if (modo!=='sumas') enterMode('sumas');
+  if (a===null) a = randInt(10, 99);
+  if (b===null) b = randInt(10, 99);
 
-  // === Elegir operandos según nivel de sumas ===
-  if (a===null || b===null){
-    const pick = genSumOperands(currentSumDifficulty || 'basico');
-    a = (a===null) ? pick.a : a;
-    b = (b===null) ? pick.b : b;
-  }
+  currentOp = { type:'suma', a, b };
 
   pieceLayer.destroyChildren(); pieceLayer.draw();
 
   const info = document.getElementById('sum-info');
   if (info){
-    const label = (currentSumDifficulty||'basico')[0].toUpperCase() + (currentSumDifficulty||'basico').slice(1);
     info.style.display = 'inline';
-    info.textContent = `Suma (${label}): ${a} + ${b}. Construye ${a} en “${LABELS.suma.A} (A)”, ` +
-                       `${b} en “${LABELS.suma.B} (B)” y deja el total en “${LABELS.suma.R}”.`;
+    info.textContent = `Suma: ${a} + ${b}. Construye ${a} en “${LABELS.suma.A} (A)”, ${b} en “${LABELS.suma.B} (B)” y deja el total en “${LABELS.suma.R}”.`;
   }
 
   computeZonesSumas(); 
@@ -1009,19 +1044,18 @@ function newSum(a=null, b=null){
 function newSub(a=null, b=null){
   oper = 'resta';
   if (modo!=='sumas') enterMode('sumas');
-
-  const max = SUM_DIFFICULTY_LEVELS[currentSumDifficulty] || 9;
-  if (a===null) a = randInt(0, max);
-  if (b===null) b = randInt(0, a);
-
+  if (a===null) a = randInt(20, 99);
+  if (b===null) b = randInt(10, a);
   if (b>a) [a,b] = [b,a]; // garantizamos A ≥ B
+
+  currentOp = { type:'resta', a, b };
 
   pieceLayer.destroyChildren(); pieceLayer.draw();
 
   const info = document.getElementById('sum-info');
   if (info){
     info.style.display = 'inline';
-    info.textContent = `Resta (${currentSumDifficulty}): ${a} − ${b}. Construye ${a} en “${LABELS.resta.A} (A)”, ${b} en “${LABELS.resta.B} (B)” y deja el resultado en “${LABELS.resta.R}”.`;
+    info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “${LABELS.resta.A} (A)”, ${b} en “${LABELS.resta.B} (B)” y deja el resultado en “${LABELS.resta.R}”.`;
   }
 
   computeZonesSumas(); 
@@ -1030,7 +1064,6 @@ function newSub(a=null, b=null){
   updateStatus();
   try{ speak(`Nueva resta: ${a} menos ${b}`);}catch{}
 }
-
 // === Asegurar mini-resumen visible en la barra ===
 function ensureMiniStatus(){
   const topbar = document.getElementById('topbar');
