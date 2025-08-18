@@ -13,16 +13,12 @@
       --muted:#636a8a;
       --btn:#ffffff;
     }
-    html, body {
-      height: 100%; margin: 0;
-      background: var(--bg); color: var(--text);
-      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-
-    /* Barra superior */
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     #topbar {
       position: relative;
-      display: flex; align-items: center; gap: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       padding: 8px 12px;
       background: var(--bar);
       border-bottom: 1px solid var(--border);
@@ -39,36 +35,13 @@
     #panel-correccion .ok { color: #2ecc71; font-weight: 600; }
     #mini-status { font-size: 14px; color:#1f2340; white-space: nowrap; }
 
-    /* Lienzo (resta topbar y franja de 34px) */
+    /* Lienzo (resta topbar y la franja de detalles de 34px) */
     #container { width: 100vw; height: calc(100vh - 48px - 34px); }
     @media (max-width: 720px){
       #container { height: calc(100vh - 56px - 34px); }
     }
 
-    /* Panel inferior plegable */
-    #panel-wrap {
-      position: fixed;
-      left: 0; right: 0;
-      bottom: 34px;   /* deja libre la franja fija */
-      z-index: 20;
-    }
-    #panel {
-      max-height: 40vh;
-      overflow: auto;
-      background: rgba(255,255,255,0.96);
-      border-top: 1px solid var(--border);
-      padding: 10px 14px;
-      transform: translateY(calc(100% - 32px)); /* cerrado asoma la pestaña */
-      transition: transform .25s ease;
-    }
-    #panel.open { transform: translateY(0%); }
-    #panel-header { display: flex; align-items: center; gap: 10px; }
-    #panel-toggle { margin-left: auto; }
-    #status { font-weight: 600; }
-    #breakdown { display: grid; grid-template-columns: 140px 1fr; gap: 4px 12px; margin-top: 8px; }
-    #mode-hint, #sum-info, #challenge { color: var(--muted); }
-
-    /* Franja inferior fija siempre visible */
+    /* Franja inferior siempre visible con la descomposición */
     #details-strip{
       position: fixed;
       left: 0; right: 0; bottom: 0;
@@ -79,13 +52,37 @@
       border-top: 1px solid var(--border);
       font-size: 14px;
       color: #1f2340;
-      z-index: 10;  /* por debajo del panel, por encima del lienzo */
+      z-index: 10;  /* debajo del panel, por encima del lienzo */
       cursor: pointer;
       user-select: none;
     }
     #details-strip:hover{ filter: brightness(0.985); }
     #details-text{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
     #details-caret{ font-size: 12px; color: #636a8a; }
+
+    /* Panel inferior plegable */
+    #panel-wrap { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; }
+    /* Panel cerrado: deja ver 34px (franja) y NO intercepta clics salvo en su botón */
+    #panel {
+      max-height: 40vh;
+      overflow: auto;
+      background: rgba(255,255,255,0.96);
+      border-top: 1px solid var(--border);
+      padding: 10px 14px;
+      transform: translateY(calc(100% - 34px)); /* deja visible la franja */
+      transition: transform .25s ease;
+      pointer-events: none;                    /* <— clave: no captura clics */
+    }
+    #panel #panel-toggle { pointer-events: auto; }  /* el botón sí es clicable */
+    #panel.open {
+      transform: translateY(0%);
+      pointer-events: auto;                    /* abierto: comportamiento normal */
+    }
+    #panel-header { display: flex; align-items: center; gap: 10px; }
+    #panel-toggle { margin-left: auto; }
+    #status { font-weight: 600; }
+    #breakdown { display: grid; grid-template-columns: 140px 1fr; gap: 4px 12px; margin-top: 8px; }
+    #mode-hint, #sum-info, #challenge { color: var(--muted); }
   </style>
 </head>
 <body>
@@ -96,7 +93,7 @@
       <button id="btn-mode-construccion" class="active" title="Modo construcción">Construcción</button>
       <button id="btn-mode-suma" title="Modo sumas/restas">Sumas</button>
 
-      <!-- Generadores -->
+      <!-- Generadores (visibles en modo sumas) -->
       <button id="btn-new-sum" style="display:none">Nueva suma</button>
       <button id="btn-new-sub" style="display:none">Nueva resta</button>
 
@@ -107,33 +104,38 @@
 
       <!-- Acciones -->
       <button id="btn-clear" title="Eliminar todas las piezas">Limpiar</button>
-      <button id="btn-corregir" title="Corregir suma">Corregir</button>
+      <button id="btn-corregir" title="Corregir suma (modo sumas)">Corregir</button>
 
-      <!-- Zoom -->
+      <!-- Zoom / Vista -->
       <button id="btn-zoom-in" title="Acercar">Zoom +</button>
       <button id="btn-zoom-out" title="Alejar">Zoom −</button>
       <button id="btn-reset-view" title="Centrar vista">Reiniciar vista</button>
 
       <!-- Extras -->
-      <button id="btn-challenge" title="Reto aleatorio">🎯 Reto</button>
+      <button id="btn-challenge" title="Reto aleatorio (construcción)">🎯 Reto</button>
       <button id="btn-say" title="Leer total en voz alta">🔊 Leer</button>
+
+      <!-- Toggle barra -->
       <button id="btn-toggle-topbar" title="Ocultar/mostrar barra superior">Ocultar barra</button>
     </div>
 
+    <!-- Mensajes de corrección a la derecha -->
     <div id="panel-correccion" aria-live="polite"></div>
+
+    <!-- Mini‑resumen siempre visible -->
     <div id="mini-status"></div>
   </div>
 
   <!-- Lienzo Konva -->
   <div id="container" aria-label="Área de trabajo"></div>
 
-  <!-- Franja inferior -->
+  <!-- Franja fija de detalles (siempre visible) -->
   <div id="details-strip" role="button" aria-controls="panel" aria-expanded="false" title="Mostrar detalles">
     <span id="details-text">Detalles…</span>
     <span id="details-caret">⬆︎</span>
   </div>
 
-  <!-- Panel plegable -->
+  <!-- Panel inferior (plegable) -->
   <div id="panel-wrap">
     <div id="panel" aria-hidden="true">
       <div id="panel-header">
@@ -145,19 +147,20 @@
         </div>
         <button id="panel-toggle" aria-expanded="false">⬆︎ Detalles</button>
       </div>
-      <div id="breakdown"><!-- se rellena desde script.js --></div>
+      <div id="breakdown"><!-- Se rellena desde script.js --></div>
     </div>
   </div>
 
-  <!-- Librería y scripts -->
+  <!-- Librería Konva y tu script -->
   <script src="https://unpkg.com/konva@9/konva.min.js"></script>
   <script src="script.js"></script>
 
+  <!-- Tips -->
   <script>
     console.log('Atajos:');
     console.log('- T: Ocultar/Mostrar barra superior');
     console.log('- Doble clic/tap: descomponer decena o centena');
-    console.log('- Ctrl/Cmd/Alt + clic o botón derecho: tachar/destachar');
+    console.log('- Ctrl/Cmd/Alt + clic o botón derecho: tachar/ destachar');
   </script>
 </body>
 </html>
