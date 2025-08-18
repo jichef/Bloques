@@ -225,7 +225,12 @@ function getPieceGroups(){
 }
 function countAll(){
   const pcs=getPieceGroups(); let u=0,t=0,h=0;
-  for (let i=0;i<pcs.length;i++){ const tp=pieceType(pcs[i]); if(tp==='unit')u++; else if(tp==='ten')t++; else if(tp==='hundred')h++; }
+  for (let i=0;i<pcs.length;i++){
+    const g = pcs[i];
+    if (isStriked(g)) continue; // ← ignora tachados
+    const tp=pieceType(g);
+    if(tp==='unit')u++; else if(tp==='ten')t++; else if(tp==='hundred')h++;
+  }
   return { units:u, tens:t, hundreds:h, total:u+10*t+100*h };
 }
 function numEnLetras(n){
@@ -334,7 +339,9 @@ function countInRect(zone){
   const arr=childrenGroups();
   let u=0,t=0,h=0;
   for (let i=0;i<arr.length;i++){
-    const g=arr[i], b=boxForGroup(g), tp=pieceType(g);
+    const g=arr[i];
+    if (isStriked(g)) continue; // ← ignora tachados
+    const b=boxForGroup(g), tp=pieceType(g);
     const inside = (b.x+b.w/2>=zone.x && b.x+b.w/2<=zone.x+zone.w && b.y+b.h/2>=zone.y && b.y+b.h/2<=zone.y+zone.h);
     if (!inside) continue;
     if (tp==='unit') u++;
@@ -364,6 +371,66 @@ function onDouble(group, cb){
   group.on('pointerdown', ()=>{ const now=Date.now(); if(now-lastTap<300) cb(); lastTap=now; });
   group.on('click',       ()=>{ const now=Date.now(); if(now-lastClick<300) cb(); lastClick=now; });
 }
+// === Tachado (solo se usa en ejercicios de resta) ===
+function isRestaActiva(){
+  // si usas "ejercicio", comprueba que exista y sea resta
+  return (typeof ejercicio !== 'undefined' && ejercicio && ejercicio.tipo === 'resta') && (modo === 'sumas');
+}
+
+function addStrikeOverlay(g){
+  // Dibuja una X por encima de la pieza, sin escuchar eventos
+  const s = typeSize(pieceType(g));
+  const grp = new Konva.Group({ x:0, y:0, name:'strikeOverlay', listening:false });
+  grp.add(new Konva.Line({ points:[0,0, s.w,s.h], stroke:'#cc0000', strokeWidth:3, listening:false }));
+  grp.add(new Konva.Line({ points:[s.w,0, 0,s.h], stroke:'#cc0000', strokeWidth:3, listening:false }));
+  return grp;
+}
+
+function setStriked(g, on){
+  g.setAttr('striked', !!on);
+  // quita overlays previos
+  g.find('.strikeOverlay').forEach(n => n.destroy());
+  if (on){
+    g.add(addStrikeOverlay(g));
+  }
+  pieceLayer.draw();
+}
+
+function isStriked(g){
+  return !!g.getAttr('striked');
+}
+
+function toggleStrike(g){
+  setStriked(g, !isStriked(g));
+}
+
+// Adjunta gestos de tachado a una pieza
+function attachStrikeHandlers(g){
+  // 1) Clic con modificador (Ctrl/Cmd/Alt) o botón secundario → toggle
+  g.on('click', (e)=>{
+    if (!isRestaActiva()) return;
+    if (e.evt.ctrlKey || e.evt.metaKey || e.evt.altKey){
+      toggleStrike(g);
+      e.cancelBubble = true;
+    }
+  });
+  g.on('contextmenu', (e)=>{
+    if (!isRestaActiva()) return;
+    e.evt.preventDefault();
+    toggleStrike(g);
+    e.cancelBubble = true;
+  });
+
+  // 2) Si la pieza cambia de tamaño (p.ej. al descomponer), reponer overlay
+  g.on('dragend', ()=>{
+    if (isStriked(g)){
+      // Recoloca la X a su tamaño actual
+      g.find('.strikeOverlay').forEach(n => n.destroy());
+      g.add(addStrikeOverlay(g));
+      pieceLayer.draw();
+    }
+  });
+}
 
 // ===== Crear piezas (usa SPAWN) =====
 function addChipRectTo(g,w,h,fill){ g.add(new Konva.Rect({x:0,y:0,width:w,height:h,fill,...CHIP_STYLE})); }
@@ -371,68 +438,94 @@ function createUnit(x,y){
   const w=GRID,h=GRID;
   let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'unit' }); g.setAttr('btype','unit'); addChipRectTo(g,w,h,COLORS.unit);
-  onDragEnd(g); pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
+  onDragEnd(g);
+  attachStrikeHandlers(g);              // ← AÑADE ESTO
+  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
+
 function createTen(x,y){
   const w=10*GRID,h=GRID;
   let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'ten' }); g.setAttr('btype','ten'); addChipRectTo(g,w,h,COLORS.ten);
   onDragEnd(g);
-  onDouble(g, ()=>{ const start=snap(g.x(),g.y()); g.destroy(); for(let k=0;k<10;k++) createUnit(start.x+k*GRID, start.y); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
+  attachStrikeHandlers(g);              // ← AÑADE ESTO
+  onDouble(g, ()=>{ 
+    // Si está tachada, no permitir descomponer (opcional)
+    if (isStriked(g)) return;
+    const start=snap(g.x(),g.y()); 
+    g.destroy(); 
+    for(let k=0;k<10;k++) createUnit(start.x+k*GRID, start.y); 
+    pieceLayer.draw(); checkBuildZones(); updateStatus(); 
+  });
   pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
+
+
 function createHundred(x,y){
   const w=10*GRID,h=10*GRID;
   let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'hundred' }); g.setAttr('btype','hundred'); addChipRectTo(g,w,h,COLORS.hundred);
-  onDragEnd(g);
-  onDouble(g, ()=>{ const start=snap(g.x(),g.y()); g.destroy(); for(let row=0;row<10;row++) createTen(start.x, start.y+row*GRID); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
+onDragEnd(g);
+  attachStrikeHandlers(g);              // ← AÑADE ESTO
+  onDouble(g, ()=>{ 
+    if (isStriked(g)) return;           // ← evita descomponer si está tachada (opcional)
+    const start=snap(g.x(),g.y()); 
+    g.destroy(); 
+    for(let row=0;row<10;row++) createTen(start.x, start.y+row*GRID); 
+    pieceLayer.draw(); checkBuildZones(); updateStatus(); 
+  });
   pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
 
 // ===== Construcción: composición automática =====
-function composeTensInZone(){
-  if(modo!=='construccion' || !zoneTenRect) return false;
-  let changed=false;
-  const rows=new Map();
-  const arr=childrenGroups();
-  for (let i=0;i<arr.length;i++){
-    const n=arr[i]; if (pieceType(n)!=='unit') continue;
-    const b=boxForGroup(n); if (!centerInRectBox(b, ZONES.tens)) continue;
-    const rowY=toCell(b.y); if(!rows.has(rowY)) rows.set(rowY, new Map());
-    rows.get(rowY).set(toCell(b.x), n);
+function composeTensInZone(zone){
+  const units = [];
+  const pcs = childrenGroups();
+  for (let i=0;i<pcs.length;i++){
+    const g=pcs[i];
+    if (pieceType(g)!=='unit') continue;
+    if (isStriked(g)) continue; // 🚫 ignorar unidades tachadas
+    const b=boxForGroup(g);
+    const inside = (b.x+b.w/2>=zone.x && b.x+b.w/2<=zone.x+zone.w &&
+                    b.y+b.h/2>=zone.y && b.y+b.h/2<=zone.y+zone.h);
+    if (inside) units.push(g);
   }
-  rows.forEach((mapX,rowY)=>{
-    const xs=[...mapX.keys()].sort((a,b)=>a-b);
-    for(let i=0;i<=xs.length-10;i++){
-      let ok=true; for(let k=0;k<10;k++){ if(!mapX.has(xs[i]+k*GRID)){ ok=false; break; } }
-      if(ok){ const nodes=[]; for(let k=0;k<10;k++) nodes.push(mapX.get(xs[i]+k*GRID)); nodes.forEach(n=>n.destroy()); createTen(xs[i],rowY); changed=true; }
-    }
-  });
-  if(!changed){
-    const pool=[]; for (let i=0;i<arr.length;i++){ const n=arr[i]; if(pieceType(n)!=='unit') continue; if(centerInRectBox(boxForGroup(n), ZONES.tens)) pool.push(n); }
-    if(pool.length>=10){ const a=snap(pool[0].x(),pool[0].y()); for(let i=0;i<10;i++) pool[i].destroy(); createTen(a.x,a.y); changed=true; }
+  if (units.length>=10){
+    // Tomamos las primeras 10 y destruimos
+    const ten = units.slice(0,10);
+    const pos = { x: zone.x, y: zone.y };
+    for (let i=0;i<ten.length;i++){ ten[i].destroy(); }
+    createTen(pos.x,pos.y);
+    pieceLayer.draw();
+    updateStatus();
+    return true;
   }
-  if(changed){ reorderTensZone(); pieceLayer.draw(); }
-  return changed;
+  return false;
 }
-function composeHundredsInZone(){
-  if(modo!=='construccion' || !zoneHundRect) return false;
-  let changed=false;
-  while(true){
-    const units=[]; const arr=childrenGroups();
-    for(let i=0;i<arr.length;i++){ const n=arr[i]; if(pieceType(n)!=='unit') continue; if(centerInRectBox(boxForGroup(n), ZONES.hund)) units.push(n); }
-    if(units.length<10) break;
-    const a=snap(units[0].x(), units[0].y()); for(let i=0;i<10;i++) units[i].destroy(); createTen(a.x,a.y); changed=true;
+
+function composeHundredsInZone(zone){
+  const tens = [];
+  const pcs = childrenGroups();
+  for (let i=0;i<pcs.length;i++){
+    const g=pcs[i];
+    if (pieceType(g)!=='ten') continue;
+    if (isStriked(g)) continue; // 🚫 ignorar decenas tachadas
+    const b=boxForGroup(g);
+    const inside = (b.x+b.w/2>=zone.x && b.x+b.w/2<=zone.x+zone.w &&
+                    b.y+b.h/2>=zone.y && b.y+b.h/2<=zone.y+zone.h);
+    if (inside) tens.push(g);
   }
-  while(true){
-    const tens=[]; const arr=childrenGroups();
-    for(let i=0;i<arr.length;i++){ const n=arr[i]; if(pieceType(n)!=='ten') continue; if(centerInRectBox(boxForGroup(n), ZONES.hund)) tens.push(n); }
-    if(tens.length<10) break;
-    const a=snap(tens[0].x(), tens[0].y()); for(let i=0;i<10;i++) tens[i].destroy(); createHundred(a.x,a.y); changed=true;
+  if (tens.length>=10){
+    // Tomamos las primeras 10 y destruimos
+    const ten = tens.slice(0,10);
+    const pos = { x: zone.x, y: zone.y };
+    for (let i=0;i<ten.length;i++){ ten[i].destroy(); }
+    createHundred(pos.x,pos.y);
+    pieceLayer.draw();
+    updateStatus();
+    return true;
   }
-  if(changed){ reorderHundredsZone(); pieceLayer.draw(); }
-  return changed;
+  return false;
 }
 function checkBuildZones(){
   if (modo!=='construccion'){ updateStatus(); return; }
@@ -576,7 +669,8 @@ function bindAny(ids, handler){
     if (el) el.addEventListener('click', handler);
   });
 }
-function wireUI(){
+function // Evita menú contextual por defecto para usar el clic derecho como “tachar”
+document.getElementById('container')?.addEventListener('contextmenu', e=> e.preventDefault());
   const $ = id => document.getElementById(id);
   const controls = $('controls');
   if (!controls) { console.error('❌ #controls no encontrado'); return; }
