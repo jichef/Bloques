@@ -11,6 +11,10 @@ const CHIP_STYLE = {
   stroke:"#1a1a1a", strokeWidth:1, cornerRadius:6,
   shadowColor:"rgba(0,0,0,0.4)", shadowBlur:6, shadowOffsetX:3, shadowOffsetY:3, shadowOpacity:0.25
 };
+// === Dificultad del reto ===
+const DIFFICULTY_LEVELS = { inicial: 10, medio: 100, avanzado: 999 };
+let currentDifficulty = (localStorage.getItem('bloques.difficulty') || 'inicial');
+if (!DIFFICULTY_LEVELS[currentDifficulty]) currentDifficulty = 'inicial';
 
 // Mundo
 const WORLD_COLS = 160, WORLD_ROWS = 120;
@@ -496,6 +500,12 @@ function updateStatus(){
     } else {
       ch.textContent = `➖ Construye: A − B = ${L.R}`;
     }
+    const mini = document.getElementById('mini-status');
+if (mini){
+  const max = DIFFICULTY_LEVELS[currentDifficulty];
+  const label = currentDifficulty[0].toUpperCase()+currentDifficulty.slice(1);
+  mini.textContent += `  ·  Nivel: ${label} (1–${max})`;
+}
   }
 }
 
@@ -807,7 +817,33 @@ function setUIForMode(){
   syncDetailsStripWithPanel();
   ensureMiniStatus();   
 }
+function setDifficulty(level){
+  if (!DIFFICULTY_LEVELS[level]) return;
+  currentDifficulty = level;
+  try { localStorage.setItem('bloques.difficulty', level); } catch {}
+  renderDifficultyUI();
+}
 
+function renderDifficultyUI(){
+  // Marca botones activos si existen
+  const map = {
+    inicial:  document.getElementById('btn-diff-inicial'),
+    medio:    document.getElementById('btn-diff-medio'),
+    avanzado: document.getElementById('btn-diff-avanzado')
+  };
+  Object.entries(map).forEach(([lvl,btn])=>{
+    if (!btn) return;
+    btn.classList.toggle('active', lvl === currentDifficulty);
+  });
+
+  // Indicador textual (opcional)
+  const ind = document.getElementById('diff-indicator');
+  if (ind){
+    const max = DIFFICULTY_LEVELS[currentDifficulty];
+    const label = currentDifficulty[0].toUpperCase()+currentDifficulty.slice(1);
+    ind.textContent = `Nivel: ${label} (1–${max})`;
+  }
+}
 function enterMode(m){
   modo = (m === 'sumas') ? 'sumas' : 'construccion';
   uiLayer.destroyChildren();
@@ -983,7 +1019,9 @@ function wireUI(){
 
       case 'btn-zoom-in':  zoomStep(+1); break;
       case 'btn-zoom-out': zoomStep(-1); break;
-
+case 'btn-diff-inicial':  setDifficulty('inicial');  break;
+case 'btn-diff-medio':    setDifficulty('medio');    break;
+case 'btn-diff-avanzado': setDifficulty('avanzado'); break;
       case 'btn-reset-view':
         world.scale = 1;
         world.x = stage.width()/2  - WORLD_W/2;
@@ -995,15 +1033,20 @@ function wireUI(){
         syncDetailsStripWithPanel();
         break;
 
-      case 'btn-challenge': {
-        if (modo!=='construccion') return;
-        const n = Math.floor(Math.random()*900)+1;
-        challengeNumber = n;
-        const ch = $('challenge');
-        if (ch) ch.textContent = `🎯 Forma el número: ${n}`;
-        speak(`Forma el número ${numEnLetras(n)}`);
-        break;
-      }
+case 'btn-challenge': {
+  if (modo!=='construccion') return;
+  const max = DIFFICULTY_LEVELS[currentDifficulty] || 999;
+  const n = Math.floor(Math.random()*max) + 1;
+  challengeNumber = n;
+
+  const ch = $('challenge');
+  if (ch){
+    const label = currentDifficulty[0].toUpperCase()+currentDifficulty.slice(1);
+    ch.textContent = `🎯 (${label}) Forma el número: ${n}`;
+  }
+  speak(`Forma el número ${numEnLetras(n)}`);
+  break;
+}
 
       case 'btn-say': {
         const {units,tens,hundreds,total}=countAll();
@@ -1043,6 +1086,7 @@ function wireUI(){
 
   // Estado inicial coherente
   setUIForMode();
+  renderDifficultyUI();
   syncDetailsStripWithPanel();
 }
 
