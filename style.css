@@ -89,16 +89,24 @@ button.active { border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108,92,231,0.1
 
 /* ===== Panel inferior (plegable) ===== */
 #panel-wrap { position: fixed; left: 0; right: 0; bottom: 0; z-index: 900; }
+/* Después: más alto y adaptativo */
 #panel {
-  max-height: 40vh;
+  /* más espacio para el contenido */
+  max-height: min(64dvh, calc(100dvh - 140px));
   overflow: auto;
   background: rgba(255,255,255,0.96);
   border-top: 1px solid var(--border);
   padding: 10px 14px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); /* extra seguridad */
   transform: translateY(calc(100% - var(--strip-h)));
   transition: transform .25s ease;
-  pointer-events: none; /* cerrado: no recibe clics */
+  pointer-events: none;
   font-size: 18px;
+}
+
+/* En pantallas pequeñas, un poco más aún */
+@media (max-width: 720px){
+  #panel { max-height: min(72dvh, calc(100dvh - 120px)); }
 }
 #panel.open {
   transform: translateY(0%);
