@@ -153,6 +153,24 @@ function setMiniStatus(texto){
   const el = document.getElementById('mini-status');
   if (el) el.textContent = texto || '';
 }
+
+function initPanelToggle() {
+  const panel = document.getElementById('panel');
+  const btn   = document.getElementById('panel-toggle');
+  if (!panel || !btn) return;
+
+  btn.addEventListener('click', () => {
+    panel.classList.toggle('open');
+    const open = panel.classList.contains('open');
+    btn.textContent = open ? "⬇︎ Ocultar detalles" : "⬆︎ Detalles";
+    btn.setAttribute("aria-expanded", open);
+
+    // Si usas la franja inferior como mini-status sincronizado:
+    if (typeof syncDetailsStripWithPanel === "function") {
+      syncDetailsStripWithPanel();
+    }
+  });
+}
 // ====== TACHADO ======
 function isStriked(g){ return !!g.getAttr('striked'); }
 function updateStrikeVisual(g){
