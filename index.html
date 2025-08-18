@@ -7,13 +7,25 @@
   <title>Bloques Web</title>
   <link rel="stylesheet" href="style.css" />
 
-  <!-- Librerías -->
+  <!-- Librería Konva -->
   <script src="https://unpkg.com/konva@9/konva.min.js"></script>
-  <!-- Números en letras (español) -->
-  <script src="https://cdn.jsdelivr.net/npm/numero-a-letras"></script>
 
-  <!-- Tu lógica (defer para esperar al DOM listo) -->
-  <script src="script.js?v=16.9.6" defer></script>
+  <!-- Tu lógica (usa versión nueva o sin query para evitar caché) -->
+  <script src="script.js?v=17.0.2" defer></script>
+  <!-- O bien: <script src="script.js" defer></script> -->
+  
+  <style>
+    /* Asegura que la UI reciba clics por encima del canvas */
+    #controls{
+      position: fixed; top: 0; left: 0;
+      z-index: 1000;
+      pointer-events: auto;
+    }
+    #container{
+      position: fixed; inset: 0;
+      z-index: 0;
+    }
+  </style>
 </head>
 <body>
   <div id="controls">
