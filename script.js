@@ -289,34 +289,29 @@ function ensurePanelListeners(){
   const panel = document.getElementById('panel');
   const btn   = document.getElementById('panel-toggle');
   const strip = document.getElementById('details-strip');
-
+  const caret = document.getElementById('details-caret');
   if (!panel) return;
 
-  const handler = () => {
-    const open = panel.classList.toggle('open');
-    if (btn){
-      btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
-      btn.setAttribute('aria-expanded', String(open));
-    }
-    panel.setAttribute('aria-hidden', String(!open));
-    if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
-    if (typeof sizeStageToContainer === 'function') sizeStageToContainer();
-  };
+  // Estado inicial coherente (aria + caret)
+  const isOpen = panel.classList.contains('open');
+  panel.setAttribute('aria-hidden', String(!isOpen));
+  if (strip) strip.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  if (caret) caret.textContent = isOpen ? '⬇︎' : '⬆︎';
 
-  // Clonar y reemplazar para quitar listeners previos y evitar duplicados
+  // ——— Elimina listeners previos clonando ———
   if (btn){
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
-    newBtn.addEventListener('click', handler);
+    newBtn.addEventListener('click', ()=> togglePanel());
   }
 
   if (strip){
     const newStrip = strip.cloneNode(true);
     strip.parentNode.replaceChild(newStrip, strip);
-    newStrip.addEventListener('click', handler);
+    newStrip.addEventListener('click', ()=> togglePanel());
   }
 
-  // Sincroniza el caret/aria al cargar
+  // Sincroniza por si alguna UI auxiliar lo necesita
   if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
 }
 // ===== SPAWN visible sin solapes =====
