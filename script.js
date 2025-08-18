@@ -1018,27 +1018,46 @@ function startIntro(){
 }
 
 // Resize & boot
+// === Ajusta el stage al tamaño real del #container (CSS calc ya descuenta la franja) ===
+function sizeStageToContainer(){
+  const c = document.getElementById('container');
+  if (!c) return;
+  stage.width(c.clientWidth);
+  stage.height(c.clientHeight);
+  stage.batchDraw();
+}
+
 function relayout(){
-  stage.width(innerWidth); stage.height(innerHeight);
+  sizeStageToContainer();     // <-- antes usabas innerHeight; ahora usamos el alto real del contenedor
   drawGrid();
-  if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); } else { computeZonesSumas(); drawZonesSumas(); }
+  if (modo==='construccion'){ 
+    computeZonesConstruccion(); 
+    drawZonesConstruccion(); 
+  } else { 
+    computeZonesSumas();       
+    drawZonesSumas();       
+  }
   applyWorldTransform();
   resetSpawnBase();
   pieceLayer.draw();
   updateStatus();
+  // Mantén la flecha de la franja en sync cuando cambie el layout
+  if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
 }
 addEventListener('resize', relayout);
 
-// Boot
-// Boot
+// ===== Boot =====
+sizeStageToContainer();        // <-- ajusta al alto del #container calculado por CSS
 drawGrid();
-computeZonesConstruccion();
+computeZonesConstruccion();    // arranca en construcción
 drawZonesConstruccion();
 applyWorldTransform();
 resetSpawnBase();
-ensureMiniStatus();     // <-- añade esto
-wireUI();
-syncDetailsStripWithPanel();
+
+ensureMiniStatus();            // mini‑resumen en topbar (y corrige el espaciado)
+wireUI();                      // listeners (incluye panel-toggle si usas mi wireUI actualizado)
+if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
+
 updateStatus();
 pieceLayer.draw();
 startIntro();
