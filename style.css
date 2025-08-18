@@ -19,14 +19,45 @@ html, body {
   font-display: swap;
 }
 
-/* Usamos Escolar en status y breakdown */
-#status,
-#breakdown {
+/* Franja superior */
+#status {
   font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  font-size: 22px;   /* antes era 16px */
-  line-height: 1.4;
+  font-size: 20px;  
+  line-height: 1.3;
+  padding-top:2px;
 }
 
+/* Panel inferior (desplegable) */
+#breakdown {
+  font-family: 'Escolar', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 26px;   /* más grande */
+  line-height: 1.5;
+  display:grid; 
+  grid-template-columns:auto 1fr; 
+  gap:6px 12px;
+}
+#breakdown .label { color:#555; }
+#breakdown .value { font-weight:600; }
+
+/* Colores de C, D y U */
+#breakdown .value {
+  font-weight: 600;
+}
+#breakdown .value::first-letter {
+  font-weight: 700;
+}
+#breakdown .value:has(> span.c) .c { color:#2ecc71; }  /* Centenas (verde) */
+#breakdown .value:has(> span.d) .d { color:#ff3b30; }  /* Decenas (rojo) */
+#breakdown .value:has(> span.u) .u { color:#1f78ff; }  /* Unidades (azul) */
+
+/* Panel inferior contenedor */
+#panel { position:fixed; left:0; right:0; bottom:0; transform:translateY(calc(100% - 44px)); transition:transform .25s ease; z-index:11; }
+#panel.open { transform: translateY(0); }
+#panel-toggle { width:100%; height:44px; border:none; background:#34495e; color:#fff; font-size:16px; cursor:pointer; }
+#panel-content { background:#fff; border-top:1px solid #e5e5e5; padding:12px 14px 16px; max-height:40vh; overflow:auto; }
+#panel h3, #panel h4 { margin:8px 0; }
+
+/* Botones superiores */
 #controls {
   position: fixed;
   top: env(safe-area-inset-top, 8px);
@@ -40,17 +71,6 @@ html, body {
 #controls button { font-size:16px; padding:10px 14px; border-radius:10px; border:none; background:#3498db; color:#fff; cursor:pointer; }
 #controls button:hover { background:#2e86c1; }
 #controls button:active { transform: translateY(1px); }
-#status { padding-top:2px; }
-
-/* Panel inferior */
-#panel { position:fixed; left:0; right:0; bottom:0; transform:translateY(calc(100% - 44px)); transition:transform .25s ease; z-index:11; }
-#panel.open { transform: translateY(0); }
-#panel-toggle { width:100%; height:44px; border:none; background:#34495e; color:#fff; font-size:16px; cursor:pointer; }
-#panel-content { background:#fff; border-top:1px solid #e5e5e5; padding:12px 14px 16px; max-height:40vh; overflow:auto; }
-#panel h3, #panel h4 { margin:8px 0; }
-#breakdown { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; }
-#breakdown .label { color:#555; }
-#breakdown .value { font-weight:600; }
 
 /* iOS: evitar zoom extraño al tocar botones */
 button { touch-action: manipulation; }
