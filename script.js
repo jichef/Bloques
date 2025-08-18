@@ -246,7 +246,53 @@ function renderSumDifficultyUI(){
   }
 }
 
+// ¿Hay alguna llevada en la suma por columnas?
+function hasCarry(a, b){
+  let carry = 0;
+  while (a > 0 || b > 0){
+    const da = a % 10, db = b % 10;
+    if (da + db + carry >= 10) return true;
+    carry = Math.floor((da + db + carry) / 10);
+    a = Math.floor(a / 10);
+    b = Math.floor(b / 10);
+  }
+  return false;
+}
 
+// Generador de operandos según nivel de sumas
+function genSumOperands(level){
+  const MAX_TRIES = 200;
+
+  if (level === 'basico'){
+    // 0–9 sin llegar a decenas: a+b < 10 (sin llevada)
+    const a = randInt(0, 9);
+    const b = randInt(0, 9 - a);
+    return {a, b};
+  }
+
+  if (level === 'avanzado'){
+    // 0–99 con llevada y resultado ≤ 100
+    // Llevada si: (a%10 + b%10 >= 10) o (a+b === 100)
+    for (let i=0;i<MAX_TRIES;i++){
+      const a = randInt(0, 99);
+      const b = randInt(0, 99);
+      const s = a + b;
+      const unitsCarry = (a % 10) + (b % 10) >= 10;
+      if (s <= 100 && (unitsCarry || s === 100)) return {a, b};
+    }
+    // Fallback seguro
+    return {a:55, b:45}; // 100 con llevada
+  }
+
+  // experto
+  for (let i=0;i<MAX_TRIES;i++){
+    const a = randInt(0, 999);
+    const b = randInt(0, 999);
+    if (hasCarry(a, b)) return {a, b};
+  }
+  // Fallback con llevada clara
+  return {a:500, b:600};
+}
 // ====== TACHADO ======
 function isStriked(g){ return !!g.getAttr('striked'); }
 function updateStrikeVisual(g){
@@ -854,24 +900,24 @@ function setDifficulty(level){
   renderDifficultyUI();
 }
 
-function renderDifficultyUI(){
-  // Marca botones activos si existen
+function renderSumDifficultyUI(){
   const map = {
-    inicial:  document.getElementById('btn-diff-inicial'),
-    medio:    document.getElementById('btn-diff-medio'),
-    avanzado: document.getElementById('btn-diff-avanzado')
+    basico:   document.getElementById('btn-sumdiff-basico'),
+    avanzado: document.getElementById('btn-sumdiff-avanzado'),
+    experto:  document.getElementById('btn-sumdiff-experto')
   };
   Object.entries(map).forEach(([lvl,btn])=>{
     if (!btn) return;
-    btn.classList.toggle('active', lvl === currentDifficulty);
+    btn.classList.toggle('active', lvl === currentSumDifficulty);
   });
 
-  // Indicador textual (opcional)
-  const ind = document.getElementById('diff-indicator');
+  const ind = document.getElementById('sumdiff-indicator');
   if (ind){
-    const max = DIFFICULTY_LEVELS[currentDifficulty];
-    const label = currentDifficulty[0].toUpperCase()+currentDifficulty.slice(1);
-    ind.textContent = `Nivel: ${label} (1–${max})`;
+    let desc = '';
+    if (currentSumDifficulty === 'basico')   desc = '0–9 (sin decenas)';
+    if (currentSumDifficulty === 'avanzado') desc = '0–99 (con llevadas, total ≤ 100)';
+    if (currentSumDifficulty === 'experto')  desc = '0–999 (con llevadas)';
+    ind.textContent = `Nivel sumas: ${desc}`;
   }
 }
 function enterMode(m){
@@ -928,16 +974,21 @@ function newSum(a=null, b=null){
   oper = 'suma';
   if (modo!=='sumas') enterMode('sumas');
 
-  const max = SUM_DIFFICULTY_LEVELS[currentSumDifficulty] || 9;
-  if (a===null) a = randInt(0, max);
-  if (b===null) b = randInt(0, max);
+  // === Elegir operandos según nivel de sumas ===
+  if (a===null || b===null){
+    const pick = genSumOperands(currentSumDifficulty || 'basico');
+    a = (a===null) ? pick.a : a;
+    b = (b===null) ? pick.b : b;
+  }
 
   pieceLayer.destroyChildren(); pieceLayer.draw();
 
   const info = document.getElementById('sum-info');
   if (info){
+    const label = (currentSumDifficulty||'basico')[0].toUpperCase() + (currentSumDifficulty||'basico').slice(1);
     info.style.display = 'inline';
-    info.textContent = `Suma (${currentSumDifficulty}): ${a} + ${b}. Construye ${a} en “${LABELS.suma.A} (A)”, ${b} en “${LABELS.suma.B} (B)” y deja el total en “${LABELS.suma.R}”.`;
+    info.textContent = `Suma (${label}): ${a} + ${b}. Construye ${a} en “${LABELS.suma.A} (A)”, ` +
+                       `${b} en “${LABELS.suma.B} (B)” y deja el total en “${LABELS.suma.R}”.`;
   }
 
   computeZonesSumas(); 
