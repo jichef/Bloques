@@ -759,119 +759,120 @@ function onDouble(group, cb){
 
 // ===== Crear piezas (usa SPAWN) =====
 function addChipRectTo(g,w,h,fill){ g.add(new Konva.Rect({x:0,y:0,width:w,height:h,fill,...CHIP_STYLE})); }
-function createUnit(x,y){
-  const w=GRID,h=GRID;
-  let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
-  const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'unit' }); g.setAttr('btype','unit'); addChipRectTo(g,w,h,COLORS.unit);
+function createUnit(x, y){
+  const w = GRID, h = GRID;
+  let pos;
+  if (x == null || y == null){
+    const r = findSpawnRect(w, h);
+    pos = { x: r.x, y: r.y };
+    advanceSpawn(w, h);
+  } else {
+    pos = snap(x, y);
+  }
+
+  const g = new Konva.Group({
+    x: pos.x, y: pos.y,
+    draggable: true,
+    name: 'unit'
+  });
+  g.setAttr('btype', 'unit');
+  g.tipo = 'unit';                        // 👈 importante
+
+  addChipRectTo(g, w, h, COLORS.unit);
   onDragEnd(g);
-  
   attachStrikeHandlers(g);
-  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus();if (GLOBAL_COMPOSE) { composeGlobal(); checkBuildZones?.(); } ; return g;// reordena zonas si aplica
+
+  pieceLayer.add(g);
+  pieceLayer.draw();
+  checkBuildZones();
+  updateStatus();
+  return g;
 }
-function createTen(x,y){
-  const w=10*GRID,h=GRID;
-  let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
-  const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'ten' }); g.setAttr('btype','ten'); addChipRectTo(g,w,h,COLORS.ten);
+
+function createTen(x, y){
+  const w = 10*GRID, h = GRID;
+  let pos;
+  if (x == null || y == null){
+    const r = findSpawnRect(w, h);
+    pos = { x: r.x, y: r.y };
+    advanceSpawn(w, h);
+  } else {
+    pos = snap(x, y);
+  }
+
+  const g = new Konva.Group({
+    x: pos.x, y: pos.y,
+    draggable: true,
+    name: 'ten'
+  });
+  g.setAttr('btype', 'ten');
+  g.tipo = 'ten';                         // 👈 importante
+
+  addChipRectTo(g, w, h, COLORS.ten);
   onDragEnd(g);
   attachStrikeHandlers(g);
-  onDouble(g, ()=>{ 
+
+  // Doble clic: descomponer 1 decena → 10 unidades en la misma fila
+  g.on('dblclick dbltap', ()=>{
+    if (isStriked(g)) return;            // no descomponer si está tachada
+    const start = snap(g.x(), g.y());
+    g.destroy();
+    for (let k = 0; k < 10; k++){
+      createUnit(start.x + k*GRID, start.y);
+    }
+    pieceLayer.draw();
+    checkBuildZones();
+    updateStatus();
+  });
+
+  pieceLayer.add(g);
+  pieceLayer.draw();
+  checkBuildZones();
+  updateStatus();
+  return g;
+}
+
+function createHundred(x, y){
+  const w = 10*GRID, h = 10*GRID;
+  let pos;
+  if (x == null || y == null){
+    const r = findSpawnRect(w, h);
+    pos = { x: r.x, y: r.y };
+    advanceSpawn(w, h);
+  } else {
+    pos = snap(x, y);
+  }
+
+  const g = new Konva.Group({
+    x: pos.x, y: pos.y,
+    draggable: true,
+    name: 'hundred'
+  });
+  g.setAttr('btype', 'hundred');
+  g.tipo = 'hundred';                     // 👈 importante
+
+  addChipRectTo(g, w, h, COLORS.hundred);
+  onDragEnd(g);
+  attachStrikeHandlers(g);
+
+  // Doble clic: descomponer 1 centena → 10 decenas en columna
+  g.on('dblclick dbltap', ()=>{
     if (isStriked(g)) return;
-    const start=snap(g.x(),g.y()); 
-    g.destroy(); 
-    for(let k=0;k<10;k++) createUnit(start.x+k*GRID, start.y); 
-    pieceLayer.draw(); checkBuildZones(); updateStatus(); 
+    const start = snap(g.x(), g.y());
+    g.destroy();
+    for (let row = 0; row < 10; row++){
+      createTen(start.x, start.y + row*GRID);
+    }
+    pieceLayer.draw();
+    checkBuildZones();
+    updateStatus();
   });
-  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); if (GLOBAL_COMPOSE) { composeGlobal(); checkBuildZones?.(); } ; return g;
-}
-function createHundred(x,y){
-  const w=10*GRID,h=10*GRID;
-  let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
-  const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'hundred' }); g.setAttr('btype','hundred'); addChipRectTo(g,w,h,COLORS.hundred);
-  onDragEnd(g);
-  attachStrikeHandlers(g);
-  onDouble(g, ()=>{ 
-    if (isStriked(g)) return;
-    const start=snap(g.x(),g.y()); 
-    g.destroy(); 
-    for(let row=0;row<10;row++) createTen(start.x, start.y+row*GRID); 
-    pieceLayer.draw(); checkBuildZones(); updateStatus(); 
-  });
-  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); if (GLOBAL_COMPOSE) { composeGlobal(); checkBuildZones?.(); } ; return g;
-}
 
-// ===== Construcción: composición automática (ignorando tachados) =====
-function composeTensInZone(){
-  if(modo!=='construccion' || !ZONES?.tens) return false;
-  let changed=false;
-  const rows=new Map();
-  const arr=childrenGroups();
-  for (let i=0;i<arr.length;i++){
-    const n=arr[i]; if (pieceType(n)!=='unit' || isStriked(n)) continue;
-    const b=boxForGroup(n); if (!centerInRectBox(b, ZONES.tens)) continue;
-    const rowY=toCell(b.y); if(!rows.has(rowY)) rows.set(rowY, new Map());
-    rows.get(rowY).set(toCell(b.x), n);
-  }
-  rows.forEach((mapX,rowY)=>{
-    const xs=[...mapX.keys()].sort((a,b)=>a-b);
-    for(let i=0;i<=xs.length-10;i++){
-      let ok=true; for(let k=0;k<10;k++){ if(!mapX.has(xs[i]+k*GRID)){ ok=false; break; } }
-      if(ok){
-        const nodes=[]; for(let k=0;k<10;k++) nodes.push(mapX.get(xs[i]+k*GRID));
-        nodes.forEach(n=>n.destroy());
-        createTen(xs[i],rowY);
-        changed=true;
-      }
-    }
-  });
-  if(!changed){
-    const pool=[];
-    const arr2=childrenGroups();
-    for (let i=0;i<arr2.length;i++){
-      const n=arr2[i]; if (pieceType(n)!=='unit' || isStriked(n)) continue;
-      if(centerInRectBox(boxForGroup(n), ZONES.tens)) pool.push(n);
-    }
-    if(pool.length>=10){
-      const a=snap(pool[0].x(),pool[0].y());
-      for(let i=0;i<10;i++) pool[i].destroy();
-      createTen(a.x,a.y);
-      changed=true;
-    }
-  }
-  if(changed){ reorderTensZone(); pieceLayer.draw(); }
-  return changed;
-}
-function composeHundredsInZone(){
-  if(modo!=='construccion' || !ZONES?.hund) return false;
-  let changed=false;
-
-  // 10u -> 1d
-  while(true){
-    const units=[]; const arr=childrenGroups();
-    for(let i=0;i<arr.length;i++){
-      const n=arr[i]; if(pieceType(n)!=='unit' || isStriked(n)) continue;
-      if(centerInRectBox(boxForGroup(n), ZONES.hund)) units.push(n);
-    }
-    if(units.length<10) break;
-    const a=snap(units[0].x(), units[0].y());
-    for(let i=0;i<10;i++) units[i].destroy();
-    createTen(a.x,a.y); changed=true;
-  }
-
-  // 10d -> 1c
-  while(true){
-    const tens=[]; const arr=childrenGroups();
-    for(let i=0;i<arr.length;i++){
-      const n=arr[i]; if(pieceType(n)!=='ten' || isStriked(n)) continue;
-      if(centerInRectBox(boxForGroup(n), ZONES.hund)) tens.push(n);
-    }
-    if(tens.length<10) break;
-    const a=snap(tens[0].x(), tens[0].y());
-    for(let i=0;i<10;i++) tens[i].destroy();
-    createHundred(a.x,a.y); changed=true;
-  }
-
-  if(changed){ reorderHundredsZone(); pieceLayer.draw(); }
-  return changed;
+  pieceLayer.add(g);
+  pieceLayer.draw();
+  checkBuildZones();
+  updateStatus();
+  return g;
 }
 function checkBuildZones(){
   if (modo!=='construccion'){ updateStatus(); return; }
