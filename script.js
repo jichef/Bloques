@@ -154,23 +154,8 @@ function setMiniStatus(texto){
   if (el) el.textContent = texto || '';
 }
 
-function initPanelToggle() {
-  const panel = document.getElementById('panel');
-  const btn   = document.getElementById('panel-toggle');
-  if (!panel || !btn) return;
 
-  btn.addEventListener('click', () => {
-    panel.classList.toggle('open');
-    const open = panel.classList.contains('open');
-    btn.textContent = open ? "⬇︎ Ocultar detalles" : "⬆︎ Detalles";
-    btn.setAttribute("aria-expanded", open);
 
-    // Si usas la franja inferior como mini-status sincronizado:
-    if (typeof syncDetailsStripWithPanel === "function") {
-      syncDetailsStripWithPanel();
-    }
-  });
-}
 // ====== TACHADO ======
 function isStriked(g){ return !!g.getAttr('striked'); }
 function updateStrikeVisual(g){
@@ -885,17 +870,17 @@ function wireUI(){
         break;
 
       // ⬆️/⬇️ Ocultar barra superior
-      case 'btn-toggle-topbar': {
-        const bar = document.getElementById('topbar');
-        if (!bar) return;
-        const hidden = bar.style.display !== 'none';
-        bar.style.display = hidden ? 'none' : 'flex';
-        btn.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
-        // reajusta stage alto si dependes del alto del viewport
-        stage.height(innerHeight - (bar.style.display==='none' ? 0 : bar.offsetHeight||0));
-        stage.batchDraw();
-        break;
-      }
+      // ⬆️/⬇️ Ocultar barra superior
+case 'btn-toggle-topbar': {
+  const bar = document.getElementById('topbar');
+  if (!bar) return;
+  const hidden = bar.style.display !== 'none';
+  bar.style.display = hidden ? 'none' : 'flex';
+  btn.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
+  // Reajusta el canvas usando el alto real del contenedor
+  sizeStageToContainer();
+  break;
+
     }
   });
 
@@ -934,18 +919,18 @@ function wireUI(){
   });
 
   // Atajo teclado: T = toggle topbar (si existe)
-  window.addEventListener('keydown', (ev)=>{
-    if ((ev.key==='t' || ev.key==='T') && !ev.metaKey && !ev.ctrlKey && !ev.altKey){
-      const bar = document.getElementById('topbar');
-      const btn = document.getElementById('btn-toggle-topbar');
-      if (!bar) return;
-      const hidden = bar.style.display !== 'none';
-      bar.style.display = hidden ? 'none' : 'flex';
-      if (btn) btn.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
-      stage.height(innerHeight - (bar.style.display==='none' ? 0 : bar.offsetHeight||0));
-      stage.batchDraw();
-    }
-  });
+  // Atajo teclado: T = toggle topbar (si existe)
+window.addEventListener('keydown', (ev)=>{
+  if ((ev.key==='t' || ev.key==='T') && !ev.metaKey && !ev.ctrlKey && !ev.altKey){
+    const bar = document.getElementById('topbar');
+    const btn = document.getElementById('btn-toggle-topbar');
+    if (!bar) return;
+    const hidden = bar.style.display !== 'none';
+    bar.style.display = hidden ? 'none' : 'flex';
+    if (btn) btn.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
+    sizeStageToContainer();  // 👈 en vez de tocar innerHeight a mano
+  }
+});
 
   // Estado visual inicial
   setUIForMode();
