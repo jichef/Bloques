@@ -568,7 +568,183 @@ function setUIForMode(){
     drawZonesConstruccion();
     if (modeHint) modeHint.textContent = 'Modo construcción: crea y compón bloques libremente.';
   }
+// ===== Corrección de operaciones (sumas con C-D-U) =====
 
+// 1) Helpers: cuenta bloques por tipo en una zona/grupo Konva
+function contarBloquesEnGrupo(grupoKonva) {
+  // Ajusta estos nombres/clases según cómo crees las piezas
+  const isUnidad  = n => n.getAttr('tipo') === 'unidad';
+  const isDecena  = n => n.getAttr('tipo') === 'decena';
+  const isCentena = n => n.getAttr('tipo') === 'centena';
+
+  let u = 0, d = 0, c = 0;
+  grupoKonva.find(node => node.getAttr && node.getAttr('tipo')).each(node => {
+    if (isUnidad(node))  u += 1;
+    else if (isDecena(node))  d += 1;
+    else if (isCentena(node)) c += 1;
+  });
+
+  return { c, d, u };
+}
+
+// 2) Convierte C-D-U a número (100·c + 10·d + u)
+function cduANum({ c, d, u }) {
+  return (c * 100) + (d * 10) + u;
+}
+
+// 3) Normaliza por si el alumno formó una decena con 10 unidades, etc.
+function normalizarCDU({ c, d, u }) {
+  let carryD = Math.floor(u / 10);
+  u = u % 10;
+  d += carryD;
+
+  let carryC = Math.floor(d / 10);
+  d = d % 10;
+  c += carryC;
+  return { c, d, u };
+}
+
+// 4) Descompone un número a C-D-U
+function numACDU(n) {
+  n = Math.max(0, Math.floor(n));
+  const c = Math.floor(n / 100);
+  const d = Math.floor((n % 100) / 10);
+  const u = n % 10;
+  return { c, d, u };
+}
+
+// 5) Compara suma con acarreo columna a columna (explica fallos)
+function comprobarSumaPasoAPaso(aCDU, bCDU, rCDU) {
+  const errores = [];
+  // Copias para no mutar
+  let a = { ...aCDU }, b = { ...bCDU }, r = { ...rCDU };
+
+  // Normaliza entradas (por si el niño dejó 13 unidades, etc.)
+  a = normalizarCDU(a);
+  b = normalizarCDU(b);
+  r = normalizarCDU(r);
+
+  // Unidades
+  const sumaU = a.u + b.u;
+  const uEsperada = sumaU % 10;
+  const carryU = Math.floor(sumaU / 10);
+  if (r.u !== uEsperada) {
+    errores.push(`En unidades debería quedar ${uEsperada}, no ${r.u}.`);
+  }
+
+  // Decenas (incluye acarreo de U)
+  const sumaD = a.d + b.d + carryU;
+  const dEsperada = sumaD % 10;
+  const carryD = Math.floor(sumaD / 10);
+  if (r.d !== dEsperada) {
+    errores.push(`En decenas debería quedar ${dEsperada}, no ${r.d}.`);
+  }
+
+  // Centenas (incluye acarreo de D)
+  const cEsperada = a.c + b.c + carryD;
+  if (r.c !== cEsperada) {
+    errores.push(`En centenas debería quedar ${cEsperada}, no ${r.c}.`);
+  }
+
+  // Verificación global como red de seguridad
+  const okGlobal = cduANum(a) + cduANum(b) === cduANum(r);
+  if (!okGlobal && errores.length === 0) {
+    errores.push(`La suma total no coincide (${cduANum(a)} + ${cduANum(b)} ≠ ${cduANum(r)}).`);
+  }
+
+  return { correcto: errores.length === 0, errores, esperado: { u: uEsperada, d: dEsperada, c: a.c + b.c + carryD } };
+}
+
+// 6) UI: pinta borde verde/rojo en una zona/grupo
+function resaltarGrupo(grupoKonva, ok) {
+  // Si usas un rect de fondo dentro del grupo con nombre 'halo', mejor apunta a él:
+  let halo = grupoKonva.findOne('.halo-correccion');
+  if (!halo) {
+    // Crea un halo discreto (no interfiere con drag)
+    const box = grupoKonva.getClientRect({ relativeTo: grupoKonva });
+    halo = new Konva.Rect({
+      x: box.x - grupoKonva.x(),
+      y: box.y - grupoKonva.y(),
+      width: box.width,
+      height: box.height,
+      listening: false,
+      strokeWidth: 3,
+      cornerRadius: 8,
+      name: 'halo-correccion'
+    });
+    grupoKonva.add(halo);
+    grupoKonva.moveToTop();
+  }
+  halo.stroke(ok ? '#2ecc71' : '#ff3b30');
+  halo.opacity(0.9);
+  halo.visible(true);
+  grupoKonva.getLayer().batchDraw();
+
+  // Quitar el halo pasado un rato
+  setTimeout(() => {
+    halo.visible(false);
+    grupoKonva.getLayer().batchDraw();
+  }, 2200);
+}
+
+// 7) Muestra lista de errores en un panel (ajusta el selector a tu HTML)
+function mostrarErrores(lista) {
+  const el = document.querySelector('#panel-correccion');
+  if (!el) return;
+  el.innerHTML = '';
+  if (lista.length === 0) {
+    el.innerHTML = '<div class="ok">✅ ¡Correcto!</div>';
+    return;
+  }
+  const ul = document.createElement('ul');
+  lista.forEach(msg => {
+    const li = document.createElement('li');
+    li.textContent = msg;
+    ul.appendChild(li);
+  });
+  el.appendChild(ul);
+}
+
+// 8) Punto de entrada de corrección.
+//    Pasa los grupos/zones donde el alumno coloca sumando A, sumando B y resultado R.
+function corregirSuma(grupoA, grupoB, grupoR) {
+  const a = contarBloquesEnGrupo(grupoA);
+  const b = contarBloquesEnGrupo(grupoB);
+  const r = contarBloquesEnGrupo(grupoR);
+
+  // Normaliza por si hay 10u=1d, 10d=1c
+  const aN = normalizarCDU(a);
+  const bN = normalizarCDU(b);
+  const rN = normalizarCDU(r);
+
+  const { correcto, errores } = comprobarSumaPasoAPaso(aN, bN, rN);
+
+  resaltarGrupo(grupoR, correcto);
+  mostrarErrores(errores);
+
+  return correcto;
+}
+
+// 9) (Opcional) Wire-up de un botón "Corregir"
+//    Cambia los selectores para localizar tus tres grupos.
+function instalarBotonCorregir() {
+  const btn = document.querySelector('#btn-corregir');
+  if (!btn) return;
+
+  // Ajusta a cómo tengas referenciados los grupos de sumandos y resultado:
+  // por ejemplo: stage.findOne('#grupoA')
+  const grupoA = window.ZONA_SUMANDO_A;  // <-- asigna cuando crees las zonas
+  const grupoB = window.ZONA_SUMANDO_B;
+  const grupoR = window.ZONA_RESULTADO;
+
+  btn.addEventListener('click', () => {
+    if (!grupoA || !grupoB || !grupoR) return mostrarErrores(['Falta configurar las zonas A, B o Resultado.']);
+    corregirSuma(grupoA, grupoB, grupoR);
+  });
+}
+
+// Llama a esto una vez tengas creadas las zonas/grupos:
+setTimeout(instalarBotonCorregir, 0);
   // Marcar pestañas activas
   btnConstruccion?.classList.toggle('active', !enSumas);
   btnSumas?.classList.toggle('active', enSumas);
