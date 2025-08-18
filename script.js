@@ -952,10 +952,9 @@ function wireUI(){
     if (!btn || !controls.contains(btn)) return;
 
     switch(btn.id){
-      // Cambio de modo
       case 'btn-mode-construccion':
         modo = 'construccion';
-        setUIForMode();               // recalcula zonas + SPAWN + status
+        setUIForMode();
         syncDetailsStripWithPanel();
         break;
 
@@ -965,16 +964,13 @@ function wireUI(){
         syncDetailsStripWithPanel();
         break;
 
-      // Crear piezas
       case 'btn-unit':    createUnit();    break;
       case 'btn-ten':     createTen();     break;
       case 'btn-hundred': createHundred(); break;
 
-      // Generadores (visibles en modo sumas)
       case 'btn-new-sum': newSum(); break;
       case 'btn-new-sub': newSub(); break;
 
-      // Limpiar todo
       case 'btn-clear':
         pieceLayer.destroyChildren();
         pieceLayer.draw();
@@ -983,9 +979,9 @@ function wireUI(){
         syncDetailsStripWithPanel();
         break;
 
-      // Zoom / Vista
-      case 'btn-zoom-in':    zoomStep(+1); break;
-      case 'btn-zoom-out':   zoomStep(-1); break;
+      case 'btn-zoom-in':  zoomStep(+1); break;
+      case 'btn-zoom-out': zoomStep(-1); break;
+
       case 'btn-reset-view':
         world.scale = 1;
         world.x = stage.width()/2  - WORLD_W/2;
@@ -997,7 +993,6 @@ function wireUI(){
         syncDetailsStripWithPanel();
         break;
 
-      // Reto (modo construcción)
       case 'btn-challenge': {
         if (modo!=='construccion') return;
         const n = Math.floor(Math.random()*900)+1;
@@ -1008,7 +1003,6 @@ function wireUI(){
         break;
       }
 
-      // Voz
       case 'btn-say': {
         const {units,tens,hundreds,total}=countAll();
         if (total===0) return;
@@ -1016,41 +1010,22 @@ function wireUI(){
         break;
       }
 
-      // Corregir suma (modo sumas)
       case 'btn-corregir':
         corregirActual();
         break;
 
-      // Ocultar/mostrar barra superior
       case 'btn-toggle-topbar': {
         const bar = $('topbar');
         if (!bar) return;
         const hidden = bar.style.display !== 'none';
         bar.style.display = hidden ? 'none' : 'flex';
         btn.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
-        sizeStageToContainer();   // reajusta canvas con el alto real del contenedor
+        sizeStageToContainer();
         break;
       }
     }
   });
 
-  // Panel plegable: botón dentro del panel
-  $('panel-toggle')?.addEventListener('click', ()=>{
-    const panel = $('panel');
-    const btn   = $('panel-toggle');
-    if (!panel) return;
-    const open  = panel.classList.toggle('open');
-
-    if (btn){
-      btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
-      btn.setAttribute('aria-expanded', String(open));
-    }
-    panel.setAttribute('aria-hidden', String(!open));
-    syncDetailsStripWithPanel();   // caret/aria de la franja
-    sizeStageToContainer();        // por si cambia el alto útil
-  });
-
-  // Franja inferior fija: también abre/cierra el 
   // Atajo teclado: T = toggle topbar
   window.addEventListener('keydown', (ev)=>{
     if ((ev.key==='t' || ev.key==='T') && !ev.metaKey && !ev.ctrlKey && !ev.altKey){
@@ -1066,7 +1041,7 @@ function wireUI(){
 
   // Estado inicial coherente
   setUIForMode();
-  syncDetailsStripWithPanel(); // asegura caret correcto al cargar
+  syncDetailsStripWithPanel();
 }
 
 // Pan & zoom
