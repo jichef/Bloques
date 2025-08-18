@@ -1188,7 +1188,16 @@ function relayout(){
   if (typeof syncDetailsStripWithPanel === 'function') syncDetailsStripWithPanel();
 }
 addEventListener('resize', relayout);
+// ==== Toggle del panel al pulsar en la franja inferior ====
+document.getElementById("details-strip").addEventListener("click", function() {
+  const panel = document.getElementById("panel");
+  const caret = document.getElementById("details-caret");
+  const expanded = panel.classList.toggle("open");
 
+  // Cambiar icono y atributo aria
+  this.setAttribute("aria-expanded", expanded ? "true" : "false");
+  caret.textContent = expanded ? "⬇︎" : "⬆︎";
+});
 // ===== Boot =====
 sizeStageToContainer();        // <-- ajusta al alto del #container calculado por CSS
 drawGrid();
