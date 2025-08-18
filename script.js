@@ -20,7 +20,7 @@ if (!DIFFICULTY_LEVELS[currentDifficulty]) currentDifficulty = 'inicial';
 let difficulty = 'auto';
 
 // Operación activa para corrección: { type:'suma'|'resta', a:number, b:number }
-let currentOp = null;
+
 // === Dificultad de sumas/restas ===
 const SUM_DIFFICULTY_LEVELS = { basico: 9, avanzado: 99, experto: 999 };
 let currentSumDifficulty = (localStorage.getItem('bloques.sumDifficulty') || 'basico');
@@ -902,16 +902,17 @@ function setUIForMode(){
   const btnNewSum = document.getElementById('btn-new-sum');
   const btnNewSub = document.getElementById('btn-new-sub');
 
+  // Botones de piezas
+  const btnUnit    = document.getElementById('btn-unit');
+  const btnTen     = document.getElementById('btn-ten');
+  const btnHundred = document.getElementById('btn-hundred');
+
   const enSumas = (modo === 'sumas');
 
   // Mostrar/ocultar según modo
-const btnUnit    = document.getElementById('btn-unit');
-  const btnTen     = document.getElementById('btn-ten');
-  const btnHundred = document.getElementById('btn-hundred');
-  if (btnUnit)    btnUnit.style.display    = 'inline-block';
-  if (btnTen)     btnTen.style.display     = 'inline-block';
-  if (btnHundred) btnHundred.style.display = 'inline-block';
-
+  if (btnUnit)    btnUnit.style.display    = enSumas ? 'none' : 'inline-block';
+  if (btnTen)     btnTen.style.display     = enSumas ? 'none' : 'inline-block';
+  if (btnHundred) btnHundred.style.display = enSumas ? 'none' : 'inline-block';
 
   if (btnChallenge) btnChallenge.style.display = enSumas ? 'none' : 'inline-block';
   if (challengeTxt){
@@ -938,11 +939,11 @@ const btnUnit    = document.getElementById('btn-unit');
   btnSumas?.classList.toggle('active', enSumas);
 
   // Reposicionar SPAWN y refrescar estado
-  
+  if (typeof updateControlsVisibility === 'function') updateControlsVisibility();
   resetSpawnBase();
   updateStatus();
   syncDetailsStripWithPanel();
-  ensureMiniStatus();   
+  ensureMiniStatus();
 }
 function setDifficulty(level){
   if (!DIFFICULTY_LEVELS[level]) return;
@@ -1129,30 +1130,41 @@ window.setDifficulty = setDifficulty; // por si lo quieres tocar desde consola/U
 
 function newSum(a=null, b=null){
   oper = 'suma';
-  if (modo!=='sumas') enterMode('sumas');
+  if (modo !== 'sumas') enterMode('sumas');
 
-  // Elegir operandos por dificultad si no vienen dados
-  if (a===null || b===null) {
-    [a, b] = pickSumOperands(difficulty);
+  // Elige operandos según el nivel de SUMAS si no vienen dados
+  if (a == null || b == null){
+    if (typeof genSumOperands === 'function') {
+      const ops = genSumOperands(currentSumDifficulty); // {a, b}
+      a = ops.a; b = ops.b;
+    } else {
+      // Fallback: usa tu generador anterior basado en 'difficulty'
+      const pair = pickSumOperands(difficulty); // [a,b]
+      a = pair[0]; b = pair[1];
+    }
   }
 
   // Limpia piezas
-  pieceLayer.destroyChildren(); pieceLayer.draw();
+  pieceLayer.destroyChildren();
+  pieceLayer.draw();
 
-  // Recuerda operación activa (para corregir contra A y B)
-  currentOp = { type:'suma', a, b };
+  // Guarda operación activa (para corrección guiada)
+  currentOp = { type: 'suma', a, b };
 
+  // Texto guía
   const info = document.getElementById('sum-info');
   if (info){
     info.style.display = 'inline';
     info.textContent = `Suma: ${a} + ${b}. Construye ${a} en “${LABELS.suma.A} (A)”, ${b} en “${LABELS.suma.B} (B)” y deja el total en “${LABELS.suma.R}”.`;
   }
 
-  computeZonesSumas(); 
-  drawZonesSumas(); 
+  // Recalcula zonas y estado
+  computeZonesSumas();
+  drawZonesSumas();
   resetSpawnBase();
   updateStatus();
-  try{ speak(`Nueva suma: ${a} más ${b}`);}catch{}
+
+  try { speak(`Nueva suma: ${a} más ${b}`); } catch {}
 }
 
 function newSub(a=null, b=null){
