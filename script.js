@@ -16,7 +16,11 @@ const CHIP_STYLE = {
 const DIFFICULTY_LEVELS = { inicial: 10, medio: 100, avanzado: 999 };
 let currentDifficulty = (localStorage.getItem('bloques.difficulty') || 'inicial');
 if (!DIFFICULTY_LEVELS[currentDifficulty]) currentDifficulty = 'inicial';
+// Dificultad actual: 'auto' | 'facil' | 'media' | 'dificil' | 'experto'
+let difficulty = 'auto';
 
+// Operación activa para corrección: { type:'suma'|'resta', a:number, b:number }
+let currentOp = null;
 // === Dificultad de sumas/restas ===
 const SUM_DIFFICULTY_LEVELS = { basico: 9, avanzado: 99, experto: 999 };
 let currentSumDifficulty = (localStorage.getItem('bloques.sumDifficulty') || 'basico');
@@ -1017,16 +1021,126 @@ function updateControlsVisibility(){
 }
 // ====== Generadores de ejercicios ======
 function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function ensureCarry(a, b) { return (a % 10) + (b % 10) >= 10; }
+function avoidCarry(a, b)  { return (a % 10) + (b % 10) < 10;  }
+
+function pickSumOperands(diff) {
+  if (!diff || diff === 'auto') diff = 'media';
+
+  // fácil: 1–9 + 1–9 (sin acarreo)
+  if (diff === 'facil') {
+    const a = randInt(1, 9), b = randInt(1, 9);
+    return [a, b];
+  }
+
+  // media: 10–99 sin acarreo en unidades
+  if (diff === 'media') {
+    let a, b, guard = 0;
+    do {
+      a = randInt(10, 99);
+      b = randInt(10, 99);
+      guard++;
+    } while (!avoidCarry(a, b) && guard < 200);
+    return [a, b];
+  }
+
+  // dificil: 10–99 con acarreo garantizado
+  if (diff === 'dificil') {
+    let a, b, guard = 0;
+    do {
+      a = randInt(10, 99);
+      b = randInt(10, 99);
+      guard++;
+    } while (!ensureCarry(a, b) && guard < 200);
+    return [a, b];
+  }
+
+  // experto: 100–999 (mixto; no forzamos ni evitamos acarreo)
+  if (diff === 'experto') {
+    const a = randInt(100, 999);
+    const b = randInt(100, 999);
+    return [a, b];
+  }
+
+  // fallback
+  return [randInt(10, 99), randInt(10, 99)];
+}
+
+function pickSubOperands(diff) {
+  if (!diff || diff === 'auto') diff = 'media';
+
+  // fácil: 2 cifras sin préstamo (A ≥ B, unidades sin préstamo)
+  if (diff === 'facil') {
+    let a, b, guard = 0;
+    do {
+      a = randInt(10, 99);
+      b = randInt(10, a);
+      guard++;
+    } while ((a % 10) < (b % 10) && guard < 200); // evita préstamo en U
+    return [a, b];
+  }
+
+  // media: 2 cifras, permitimos préstamo a veces (no forzado)
+  if (diff === 'media') {
+    const a = randInt(10, 99);
+    const b = randInt(10, a);
+    return [a, b];
+  }
+
+  // dificil: 2 cifras con préstamo garantizado en unidades
+  if (diff === 'dificil') {
+    let a, b, guard = 0;
+    do {
+      a = randInt(10, 99);
+      b = randInt(10, a);
+      guard++;
+    } while ((a % 10) >= (b % 10) && guard < 200); // fuerza préstamo en U
+    return [a, b];
+  }
+
+  // experto: 3 cifras (puede haber múltiples préstamos)
+  if (diff === 'experto') {
+    let a = randInt(100, 999);
+    let b = randInt(100, a);
+    return [a, b];
+  }
+
+  // fallback
+  let a = randInt(10, 99);
+  let b = randInt(10, a);
+  return [a, b];
+}
+// Llama: setDifficulty('facil'|'media'|'dificil'|'experto'|'auto')
+function setDifficulty(level) {
+  const levels = new Set(['auto','facil','media','dificil','experto']);
+  difficulty = levels.has(level) ? level : 'auto';
+
+  // (Opcional) marca botones si existen
+  ['btn-diff-facil','btn-diff-media','btn-diff-dificil','btn-diff-experto','btn-diff-auto']
+    .forEach(id => document.getElementById(id)?.classList.remove('active'));
+  const mapId = {
+    auto:'btn-diff-auto', facil:'btn-diff-facil', media:'btn-diff-media',
+    dificil:'btn-diff-dificil', experto:'btn-diff-experto'
+  };
+  const el = document.getElementById(mapId[difficulty]);
+  if (el) el.classList.add('active');
+}
+window.setDifficulty = setDifficulty; // por si lo quieres tocar desde consola/UI
 
 function newSum(a=null, b=null){
   oper = 'suma';
   if (modo!=='sumas') enterMode('sumas');
-  if (a===null) a = randInt(10, 99);
-  if (b===null) b = randInt(10, 99);
 
-  currentOp = { type:'suma', a, b };
+  // Elegir operandos por dificultad si no vienen dados
+  if (a===null || b===null) {
+    [a, b] = pickSumOperands(difficulty);
+  }
 
+  // Limpia piezas
   pieceLayer.destroyChildren(); pieceLayer.draw();
+
+  // Recuerda operación activa (para corregir contra A y B)
+  currentOp = { type:'suma', a, b };
 
   const info = document.getElementById('sum-info');
   if (info){
@@ -1044,13 +1158,19 @@ function newSum(a=null, b=null){
 function newSub(a=null, b=null){
   oper = 'resta';
   if (modo!=='sumas') enterMode('sumas');
-  if (a===null) a = randInt(20, 99);
-  if (b===null) b = randInt(10, a);
-  if (b>a) [a,b] = [b,a]; // garantizamos A ≥ B
 
-  currentOp = { type:'resta', a, b };
+  // Elegir operandos por dificultad si no vienen dados
+  if (a===null || b===null) {
+    [a, b] = pickSubOperands(difficulty);
+  }
+
+  // Garantiza A ≥ B
+  if (b > a) [a, b] = [b, a];
 
   pieceLayer.destroyChildren(); pieceLayer.draw();
+
+  // Recuerda operación activa
+  currentOp = { type:'resta', a, b };
 
   const info = document.getElementById('sum-info');
   if (info){
