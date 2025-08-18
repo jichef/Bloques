@@ -471,38 +471,62 @@ function ensureSumInfo(){
 }
 
 // ====== Helpers UI de modo ======
+// ====== Helpers UI de modo ======
 function setUIForMode(){
-  ensureSumInfo();
+  // Asegura el contenedor del enunciado (si usas ensureSumInfo, déjalo)
+  if (!document.getElementById('sum-info')) {
+    const controls = document.getElementById('controls');
+    if (controls){
+      const row = document.createElement('div');
+      row.className = 'row';
+      const span = document.createElement('span');
+      span.id = 'sum-info';
+      span.style.display = 'none';
+      span.style.marginLeft = '12px';
+      row.appendChild(span);
+      controls.appendChild(row);
+    }
+  }
 
   const btnChallenge = document.getElementById('btn-challenge');
   const challengeTxt = document.getElementById('challenge');
   const sumInfo      = document.getElementById('sum-info');
-  const btnSum       = document.getElementById('btn-sum');
-  const btnSub       = document.getElementById('btn-sub');
+
+  // ✅ IDs correctos según tu HTML
+  const btnSum       = document.getElementById('btn-new-sum');
+  const btnSub       = document.getElementById('btn-new-sub');
 
   if (modo === 'construccion'){
-    btnChallenge && (btnChallenge.style.display = 'inline-block');
-    challengeTxt && (challengeTxt.style.display = 'inline');
+    // Reto visible
+    if (btnChallenge) btnChallenge.style.display = 'inline-block';
+    if (challengeTxt) challengeTxt.style.display = 'inline';
 
-    sumInfo && (sumInfo.style.display = 'none', sumInfo.textContent = '');
-    btnSum  && (btnSum.style.display  = 'none');
-    btnSub  && (btnSub.style.display  = 'none');
+    // Enunciado y generadores ocultos
+    if (sumInfo){ sumInfo.style.display = 'none'; sumInfo.textContent = ''; }
+    if (btnSum)  btnSum.style.display  = 'none';
+    if (btnSub)  btnSub.style.display  = 'none';
 
-    computeZonesConstruccion(); drawZonesConstruccion();
-  } else {
-    btnChallenge && (btnChallenge.style.display = 'none');
+    computeZonesConstruccion();
+    drawZonesConstruccion();
+
+  } else { // 'sumas'
+    // Ocultar reto
+    if (btnChallenge) btnChallenge.style.display = 'none';
     if (challengeTxt){ challengeTxt.style.display = 'none'; challengeTxt.textContent = ''; }
 
-    sumInfo && (sumInfo.style.display = 'inline');
-    btnSum  && (btnSum.style.display  = 'inline-block');
-    btnSub  && (btnSub.style.display  = 'inline-block');
+    // Mostrar enunciado y generadores
+    if (sumInfo) sumInfo.style.display = 'inline';
+    if (btnSum)  btnSum.style.display  = 'inline-block';
+    if (btnSub)  btnSub.style.display  = 'inline-block';
 
-    computeZonesSumas(); drawZonesSumas();
+    computeZonesSumas();
+    drawZonesSumas();
   }
 
   resetSpawnBase();
   updateStatus();
 
+  // Si usas el botón toggle "Modo: …" inyectado
   const btnMode = document.getElementById('btn-mode');
   if (btnMode) btnMode.textContent = 'Modo: ' + (modo === 'construccion' ? 'Construcción' : 'Sumas');
 }
@@ -530,6 +554,7 @@ function newSum(a=null, b=null){
   updateStatus();
   speak(`Nueva suma: ${a} más ${b}`);
 }
+
 function newSub(a=null, b=null){
   if (modo!=='sumas') enterSumasMode();
   if (a===null) a = randInt(20, 99);
@@ -538,7 +563,7 @@ function newSub(a=null, b=null){
 
   pieceLayer.destroyChildren(); pieceLayer.draw();
   const info = document.getElementById('sum-info');
-  if (info) info.textContent = `Resta: ${a} − ${b}. Coloca A (minuendo) y B (sustraendo) y deja el resultado en “Resultado”.`;
+  if (info) info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “Minuendo (A)”, ${b} en “Sustraendo (B)” y deja el resultado en “Resultado”.`;
 
   computeZonesSumas(); drawZonesSumas();
   resetSpawnBase();
@@ -553,55 +578,68 @@ function bindAny(ids, handler){
     if (el) el.addEventListener('click', handler);
   });
 }
+// ====== Wire UI ======
 function wireUI(){
   const $ = id => document.getElementById(id);
 
-  ensureModeButton();
-  ensureSumInfo();
+  // (opcional) botón toggle “Modo: …” inyectado por código
+  if (!$('#btn-mode')){
+    const controls = $('#controls');
+    if (controls){
+      const row = document.createElement('div');
+      row.className = 'row';
+      const btn = document.createElement('button');
+      btn.id = 'btn-mode';
+      btn.textContent = 'Modo: Construcción';
+      btn.addEventListener('click', ()=> enterMode(modo === 'construccion' ? 'sumas' : 'construccion'));
+      row.appendChild(btn);
+      controls.prepend(row);
+    }
+  }
 
-  // Modo explícito (si los tienes en HTML)
-  bindAny(['btn-mode-construccion','btn-construccion','btn-construction'], enterConstruccionMode);
-  bindAny(['btn-mode-suma','btn-mode-sumas','btn-sumas','btn-sumrest'], enterSumasMode);
-
-  // Toggle modo inyectado
-  $('#btn-mode')?.addEventListener('click', ()=> enterMode(modo === 'construccion' ? 'sumas' : 'construccion'));
+  // Botones de modo explícitos (si existen en tu HTML)
+  $('#btn-mode-construccion')?.addEventListener('click', enterConstruccionMode);
+  $('#btn-mode-suma')?.addEventListener('click', enterSumasMode);
 
   // Crear piezas
   $('#btn-unit')   ?.addEventListener('click', ()=> createUnit());
   $('#btn-ten')    ?.addEventListener('click', ()=> createTen());
   $('#btn-hundred')?.addEventListener('click', ()=> createHundred());
 
-  // Generadores
-  $('#btn-sum')?.addEventListener('click', ()=> newSum());
-  $('#btn-sub')?.addEventListener('click', ()=> newSub());
+  // ✅ Generadores — IDs correctos
+  $('#btn-new-sum')?.addEventListener('click', ()=> newSum());
+  $('#btn-new-sub')?.addEventListener('click', ()=> newSub());
 
   // Limpiar
   $('#btn-clear')?.addEventListener('click', ()=>{
-    pieceLayer.destroyChildren(); pieceLayer.draw(); updateStatus(); resetSpawnBase();
+    pieceLayer.destroyChildren();
+    pieceLayer.draw();
+    updateStatus();
+    resetSpawnBase();
   });
 
   // Voz
   $('#btn-say')?.addEventListener('click', ()=>{
     const {units,tens,hundreds,total}=countAll();
-    if(total===0) return;
+    if (total===0) return;
     hablarDescompYLetras(hundreds,tens,units,total,1100);
   });
 
-  // Reto (oculto en modo sumas por setUIForMode)
+  // Reto (se oculta en modo sumas dentro de setUIForMode)
   $('#btn-challenge')?.addEventListener('click', ()=>{
     if (modo!=='construccion') return;
-    challengeNumber=Math.floor(Math.random()*900)+1;
-    const ch=$('challenge');
-    if(ch) ch.textContent=`🎯 Forma el número: ${challengeNumber}`;
+    challengeNumber = Math.floor(Math.random()*900)+1;
+    const ch = $('#challenge');
+    if (ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
     speak(`Forma el número ${numEnLetras(challengeNumber)}`);
   });
 
   // Panel
   $('#panel-toggle')?.addEventListener('click', ()=>{
-    const panel=$('#panel');
-    const open=panel.classList.toggle('open');
-    const btn=$('#panel-toggle');
-    btn.textContent=open?'⬇︎ Ocultar detalles':'⬆︎ Detalles';
+    const panel = $('#panel');
+    const open = panel.classList.toggle('open');
+    const btn = $('#panel-toggle');
+    btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
     btn.setAttribute('aria-expanded', String(open));
     panel.setAttribute('aria-hidden', String(!open));
   });
@@ -609,20 +647,18 @@ function wireUI(){
   // Zoom
   const bindZoom=(id,fn)=>{
     const el=$(id); if(!el) return;
-    el.addEventListener('click', e=>{e.preventDefault(); fn();});
-    el.addEventListener('pointerdown', e=>{e.preventDefault(); fn();});
+    el.addEventListener('click', e=>{ e.preventDefault(); fn(); });
+    el.addEventListener('pointerdown', e=>{ e.preventDefault(); fn(); });
   };
-  bindZoom('btn-zoom-in',  ()=>zoomStep(+1));
-  bindZoom('btn-zoom-out', ()=>zoomStep(-1));
+  bindZoom('btn-zoom-in',  ()=> zoomStep(+1));
+  bindZoom('btn-zoom-out', ()=> zoomStep(-1));
   bindZoom('btn-reset-view', ()=>{
     world.scale=1;
     world.x = stage.width()/2  - WORLD_W/2;
     world.y = stage.height()/2 - WORLD_H/2;
     applyWorldTransform();
-
     if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); }
     else                      { computeZonesSumas();       drawZonesSumas();       }
-
     resetSpawnBase();
     updateStatus();
   });
