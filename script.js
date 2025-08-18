@@ -862,6 +862,14 @@ function setUIForMode(){
   const enSumas = (modo === 'sumas');
 
   // Mostrar/ocultar según modo
+const btnUnit    = document.getElementById('btn-unit');
+  const btnTen     = document.getElementById('btn-ten');
+  const btnHundred = document.getElementById('btn-hundred');
+  if (btnUnit)    btnUnit.style.display    = 'inline-block';
+  if (btnTen)     btnTen.style.display     = 'inline-block';
+  if (btnHundred) btnHundred.style.display = 'inline-block';
+
+
   if (btnChallenge) btnChallenge.style.display = enSumas ? 'none' : 'inline-block';
   if (challengeTxt){
     challengeTxt.style.display = enSumas ? 'none' : 'inline';
