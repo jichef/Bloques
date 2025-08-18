@@ -35,38 +35,7 @@ function applyWorldTransform(){
   });
   stage.batchDraw();
 }
-// === Tachado / borrado lógico para restas ===
-let ERASE_MODE = false;
 
-function isCrossed(g){ return !!g.getAttr('crossed'); }
-function setCrossed(g, val){
-  g.setAttr('crossed', !!val);
-  // crea/recupera overlay
-  let x = g.findOne('.crossmark');
-  if (!x){
-    const s = typeSize(pieceType(g));
-    x = new Konva.Line({
-      points: [4, 4, s.w-4, s.h-4],
-      stroke: '#000',
-      strokeWidth: 3,
-      opacity: 0.7,
-      name: 'crossmark',
-      listening: false,
-    });
-    g.add(x);
-  }
-  x.visible(!!val);
-  // estilo visual del bloque
-  const rect = g.findOne('Rect');
-  if (rect) rect.opacity(val ? 0.45 : 1);
-  g.cache(); g.draw();
-}
-
-// En restas, ignoramos las piezas tachadas en los conteos de zona
-function shouldIgnoreInCounts(g){
-  // Puedes hacerlo siempre, pero lo acotamos a las restas:
-  return (ejercicio?.tipo === 'resta') && isCrossed(g);
-}
 // ---- MODO ----
 let modo = 'construccion';    // 'construccion' | 'sumas'
 
@@ -365,9 +334,7 @@ function countInRect(zone){
   const arr=childrenGroups();
   let u=0,t=0,h=0;
   for (let i=0;i<arr.length;i++){
-    const g=arr[i];
-    if (shouldIgnoreInCounts(g)) continue;         // <— NUEVO: ignora tachados en restas
-    const b=boxForGroup(g), tp=pieceType(g);
+    const g=arr[i], b=boxForGroup(g), tp=pieceType(g);
     const inside = (b.x+b.w/2>=zone.x && b.x+b.w/2<=zone.x+zone.w && b.y+b.h/2>=zone.y && b.y+b.h/2<=zone.y+zone.h);
     if (!inside) continue;
     if (tp==='unit') u++;
@@ -399,46 +366,12 @@ function onDouble(group, cb){
 }
 
 // ===== Crear piezas (usa SPAWN) =====
-function attachCrossHandlers(g){
-  // Clic derecho → alternar
-  g.on('contextmenu', (e)=>{
-    e.evt.preventDefault();
-    setCrossed(g, !isCrossed(g));
-    pieceLayer.draw();
-    updateStatus();
-  });
-
-  // Pulsación prolongada 500ms → alternar (móviles)
-  let pressTimer=null, pressed=false;
-  g.on('pointerdown', ()=>{
-    pressed = true;
-    pressTimer = setTimeout(()=>{
-      if (!pressed) return;
-      setCrossed(g, !isCrossed(g));
-      pieceLayer.draw();
-      updateStatus();
-    }, 500);
-  });
-  g.on('pointerup pointerleave dragstart', ()=>{
-    pressed=false;
-    clearTimeout(pressTimer);
-  });
-
-  // Si activas “modo tachado”, un clic normal también alterna
-  g.on('click tap', ()=>{
-    if (!ERASE_MODE) return;
-    setCrossed(g, !isCrossed(g));
-    pieceLayer.draw();
-    updateStatus();
-  });
-}
 function addChipRectTo(g,w,h,fill){ g.add(new Konva.Rect({x:0,y:0,width:w,height:h,fill,...CHIP_STYLE})); }
 function createUnit(x,y){
   const w=GRID,h=GRID;
   let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'unit' }); g.setAttr('btype','unit'); addChipRectTo(g,w,h,COLORS.unit);
-  onDragEnd(g); pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); onDragEnd(g);
-attachCrossHandlers(g);   return g;
+  onDragEnd(g); pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
 function createTen(x,y){
   const w=10*GRID,h=GRID;
@@ -446,7 +379,7 @@ function createTen(x,y){
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'ten' }); g.setAttr('btype','ten'); addChipRectTo(g,w,h,COLORS.ten);
   onDragEnd(g);
   onDouble(g, ()=>{ const start=snap(g.x(),g.y()); g.destroy(); for(let k=0;k<10;k++) createUnit(start.x+k*GRID, start.y); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
-  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); attachCrossHandlers(g);   return g;
+  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
 function createHundred(x,y){
   const w=10*GRID,h=10*GRID;
@@ -454,7 +387,7 @@ function createHundred(x,y){
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'hundred' }); g.setAttr('btype','hundred'); addChipRectTo(g,w,h,COLORS.hundred);
   onDragEnd(g);
   onDouble(g, ()=>{ const start=snap(g.x(),g.y()); g.destroy(); for(let row=0;row<10;row++) createTen(start.x, start.y+row*GRID); pieceLayer.draw(); checkBuildZones(); updateStatus(); });
-  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); attachCrossHandlers(g);   return g;
+  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
 }
 
 // ===== Construcción: composición automática =====
@@ -536,85 +469,52 @@ function ensureSumInfo(){
   row.appendChild(span);
   controls.appendChild(row);
 }
-function ensureEraseButton(){
-  if (document.getElementById('btn-erase')) return;
-  const controls = document.getElementById('controls');
-  if (!controls) return;
-  const row = document.createElement('div');
-  row.className = 'row';
-  const btn = document.createElement('button');
-  btn.id = 'btn-erase';
-  btn.textContent = '✖︎ Tachado: OFF';
-  btn.style.display = 'none'; // visible solo en restas
-  row.appendChild(btn);
-  controls.insertBefore(row, controls.children[1] || null);
-}
+
 // ====== Helpers UI de modo ======
 function setUIForMode(){
-  // Asegura auxiliares (crean si faltan)
-  ensureSumInfo?.();
-  ensureEraseButton?.();
-
+  // Elementos de UI (IDs tal como en tu HTML)
   const btnConstruccion = document.getElementById('btn-mode-construccion');
   const btnSumas        = document.getElementById('btn-mode-suma');
   const modeHint        = document.getElementById('mode-hint');
 
   const btnChallenge = document.getElementById('btn-challenge');
   const challengeTxt = document.getElementById('challenge');
-  const sumInfo      = document.getElementById('sum-info');
-  const btnNewSum    = document.getElementById('btn-new-sum');
-  const btnNewSub    = document.getElementById('btn-new-sub');
-  const btnErase     = document.getElementById('btn-erase');
 
-  if (modo === 'construccion'){
-    // Mostrar controles de construcción
-    if (btnChallenge) btnChallenge.style.display = 'inline-block';
-    if (challengeTxt) { challengeTxt.style.display = 'inline'; }
+  const sumInfo    = document.getElementById('sum-info');
+  const btnNewSum  = document.getElementById('btn-new-sum');
+  const btnNewSub  = document.getElementById('btn-new-sub');
 
-    // Ocultar controles de sumas/restas
-    if (sumInfo) { sumInfo.style.display = 'none'; sumInfo.textContent = ''; }
-    if (btnNewSum) btnNewSum.style.display = 'none';
-    if (btnNewSub) btnNewSub.style.display = 'none';
+  const enSumas = (modo === 'sumas');
 
-    // Ocultar tachado y resetear su estado
-    if (btnErase){ btnErase.style.display = 'none'; ERASE_MODE = false; btnErase.textContent = '✖︎ Tachado: OFF'; }
-
-    // Zonas de construcción
-    computeZonesConstruccion?.();
-    drawZonesConstruccion?.();
-
-    if (modeHint) modeHint.textContent = 'Modo construcción: crea y compón bloques libremente.';
-  } else { // modo === 'sumas'
-    // Ocultar reto
-    if (btnChallenge) btnChallenge.style.display = 'none';
-    if (challengeTxt){ challengeTxt.style.display = 'none'; challengeTxt.textContent = ''; }
-
-    // Mostrar enunciado y generadores
-    if (sumInfo) sumInfo.style.display = 'inline';
-    if (btnNewSum) btnNewSum.style.display = 'inline-block';
-    if (btnNewSub) btnNewSub.style.display = 'inline-block';
-
-    // Mostrar botón Tachado SOLO si el ejercicio actual es una RESTA
-    const showErase = (ejercicio?.tipo === 'resta');
-    if (btnErase){
-      btnErase.style.display = showErase ? 'inline-block' : 'none';
-      if (!showErase){ ERASE_MODE = false; btnErase.textContent = '✖︎ Tachado: OFF'; }
-    }
-
-    // Zonas de sumas/restas
-    computeZonesSumas?.();
-    drawZonesSumas?.();
-
-    if (modeHint) modeHint.textContent = 'Modo sumas/restas: construye A, B y el Resultado.';
+  // Mostrar/ocultar según modo
+  if (btnChallenge) btnChallenge.style.display = enSumas ? 'none' : 'inline-block';
+  if (challengeTxt){
+    challengeTxt.style.display = enSumas ? 'none' : 'inline';
+    if (enSumas) challengeTxt.textContent = '';
   }
 
-  // Marcar botón de modo activo
-  btnConstruccion?.classList.toggle('active', modo === 'construccion');
-  btnSumas?.classList.toggle('active',        modo === 'sumas');
+  if (sumInfo)   sumInfo.style.display   = enSumas ? 'inline'      : 'none';
+  if (btnNewSum) btnNewSum.style.display = enSumas ? 'inline-block': 'none';
+  if (btnNewSub) btnNewSub.style.display = enSumas ? 'inline-block': 'none';
+
+  // Zonas según modo
+  if (enSumas){
+    computeZonesSumas();
+    drawZonesSumas();
+    if (modeHint) modeHint.textContent = 'Modo sumas/restas: construye A, B y el Resultado.';
+  } else {
+    computeZonesConstruccion();
+    drawZonesConstruccion();
+    if (modeHint) modeHint.textContent = 'Modo construcción: crea y compón bloques libremente.';
+  }
+
+  // Marcar pestañas activas
+  btnConstruccion?.classList.toggle('active', !enSumas);
+  btnSumas?.classList.toggle('active', enSumas);
 
   // Reposicionar SPAWN y refrescar estado
-  resetSpawnBase?.();
-  updateStatus?.();
+  resetSpawnBase();
+  updateStatus();
 }
 
 
@@ -663,12 +563,13 @@ function newSub(a=null, b=null){
     info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “Minuendo (A)”, ${b} en “Sustraendo (B)” y deja el total en “Resultado”.`;
   }
 
-  computeZonesSumas(); drawZonesSumas();
+  computeZonesSumas(); 
+  drawZonesSumas(); 
   resetSpawnBase();
   updateStatus();
-  setUIForMode(); // <— asegura visibilidad del botón “Tachado”
-  speak(`Nueva resta: ${a} menos ${b}`);
+  try{ speak(`Nueva resta: ${a} menos ${b}`);}catch{}
 }
+
 // ====== Wire UI ======
 function bindAny(ids, handler){
   ids.forEach(id=>{
@@ -676,29 +577,19 @@ function bindAny(ids, handler){
     if (el) el.addEventListener('click', handler);
   });
 }
-// --- wireUI (reemplaza la tuya) ---
 function wireUI(){
-  const $ = (id) => document.getElementById(id);
+  const $ = id => document.getElementById(id);
 
-  // Asegura elementos auxiliares en la UI
-  ensureModeButton?.();
-  ensureSumInfo?.();
-  ensureEraseButton?.();
-
-  // Cambios de modo
-  $('#btn-mode-construccion')?.addEventListener('click', ()=> { modo='construccion'; setUIForMode(); });
-  $('#btn-mode-suma')?.addEventListener('click',          ()=> { modo='sumas';        setUIForMode(); });
-  $('#btn-mode')?.addEventListener('click', ()=>{ // (si usas el toggle inyectado)
-    modo = (modo === 'construccion') ? 'sumas' : 'construccion';
-    setUIForMode();
-  });
+  // Cambio de modo (coincide con tus IDs)
+  $('#btn-mode-construccion')?.addEventListener('click', ()=>{ modo='construccion'; setUIForMode(); });
+  $('#btn-mode-suma')?.addEventListener('click',          ()=>{ modo='sumas';        setUIForMode(); });
 
   // Crear piezas
   $('#btn-unit')   ?.addEventListener('click', ()=> createUnit());
   $('#btn-ten')    ?.addEventListener('click', ()=> createTen());
   $('#btn-hundred')?.addEventListener('click', ()=> createHundred());
 
-  // Generar ejercicios
+  // Generadores (coinciden con tu HTML)
   $('#btn-new-sum')?.addEventListener('click', ()=> newSum());
   $('#btn-new-sub')?.addEventListener('click', ()=> newSub());
 
@@ -710,60 +601,54 @@ function wireUI(){
     resetSpawnBase();
   });
 
-  // Voz
-  $('#btn-say')?.addEventListener('click', ()=>{
-    const {units,tens,hundreds,total}=countAll();
-    if(total===0) return;
-    hablarDescompYLetras(hundreds,tens,units,total,1100);
-  });
-
-  // Reto (queda oculto en modo sumas por setUIForMode)
+  // Reto (solo tendrá efecto visible en construcción por setUIForMode)
   $('#btn-challenge')?.addEventListener('click', ()=>{
     if (modo!=='construccion') return;
     challengeNumber = Math.floor(Math.random()*900)+1;
     const ch = $('#challenge');
-    if(ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
+    if (ch) ch.textContent = `🎯 Forma el número: ${challengeNumber}`;
     speak(`Forma el número ${numEnLetras(challengeNumber)}`);
   });
 
-  // Botón Tachado (su visibilidad la controla setUIForMode)
-  $('#btn-erase')?.addEventListener('click', ()=>{
-    ERASE_MODE = !ERASE_MODE;
-    const btn = $('#btn-erase');
-    if (btn) btn.textContent = `✖︎ Tachado: ${ERASE_MODE ? 'ON' : 'OFF'}`;
+  // Voz
+  $('#btn-say')?.addEventListener('click', ()=>{
+    const {units,tens,hundreds,total}=countAll();
+    if (total===0) return;
+    hablarDescompYLetras(hundreds,tens,units,total,1100);
   });
 
   // Panel detalles
   $('#panel-toggle')?.addEventListener('click', ()=>{
     const panel = $('#panel');
-    const open = panel.classList.toggle('open');
-    const btn  = $('#panel-toggle');
+    const open  = panel.classList.toggle('open');
+    const btn   = $('#panel-toggle');
     btn.textContent = open ? '⬇︎ Ocultar detalles' : '⬆︎ Detalles';
     btn.setAttribute('aria-expanded', String(open));
     panel.setAttribute('aria-hidden', String(!open));
   });
 
   // Zoom
-  const bindZoom=(id,fn)=>{
+  const bindZoom = (id, fn)=>{
     const el=$(id); if(!el) return;
-    el.addEventListener('click', e=>{e.preventDefault(); fn();});
-    el.addEventListener('pointerdown', e=>{e.preventDefault(); fn();});
+    el.addEventListener('click', e=>{ e.preventDefault(); fn(); });
+    el.addEventListener('pointerdown', e=>{ e.preventDefault(); fn(); });
   };
   bindZoom('btn-zoom-in',  ()=>zoomStep(+1));
   bindZoom('btn-zoom-out', ()=>zoomStep(-1));
   bindZoom('btn-reset-view', ()=>{
-    world.scale=1;
+    world.scale = 1;
     world.x = stage.width()/2  - WORLD_W/2;
     world.y = stage.height()/2 - WORLD_H/2;
     applyWorldTransform();
-    // Redibuja zonas según modo actual
-    if (modo==='construccion'){ computeZonesConstruccion?.(); drawZonesConstruccion?.(); }
-    else                      { computeZonesSumas?.();       drawZonesSumas?.();       }
-    resetSpawnBase?.();
-    updateStatus?.();
+
+    if (modo==='construccion'){ computeZonesConstruccion(); drawZonesConstruccion(); }
+    else                      { computeZonesSumas();       drawZonesSumas();       }
+
+    resetSpawnBase();
+    updateStatus();
   });
 
-  // Estado visual inicial
+  // Ajuste visual inicial
   setUIForMode();
 }
 
