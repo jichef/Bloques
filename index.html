@@ -36,7 +36,7 @@
     #mini-status { font-size: 14px; color:#1f2340; white-space: nowrap; }
 
     /* Panel inferior plegable */
-    #panel-wrap { position: fixed; left: 0; right: 0; bottom: 0; pointer-events: none; }
+    #panel-wrap { position: fixed; left: 0; right: 0; bottom: 34px; /* <- deja hueco para la franja */ pointer-events: none; z-index: 20; }
     #panel {
       max-height: 40vh; overflow: auto; background: rgba(255,255,255,0.96);
       border-top: 1px solid var(--border); padding: 10px 14px;
@@ -50,11 +50,30 @@
     #breakdown { display: grid; grid-template-columns: 140px 1fr; gap: 4px 12px; margin-top: 8px; }
     #mode-hint, #sum-info, #challenge { color: var(--muted); }
 
-    /* Lienzo */
-    #container { width: 100vw; height: calc(100vh - 48px); }
+    /* Lienzo (resta topbar y la franja de detalles de 34px) */
+    #container { width: 100vw; height: calc(100vh - 48px - 34px); }
     @media (max-width: 720px){
-      #container { height: calc(100vh - 56px); }
+      #container { height: calc(100vh - 56px - 34px); }
     }
+
+    /* Franja inferior siempre visible con la descomposición */
+    #details-strip{
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      height: 34px;
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 14px;
+      background: rgba(255,255,255,0.96);
+      border-top: 1px solid var(--border);
+      font-size: 14px;
+      color: #1f2340;
+      z-index: 10;  /* por encima del lienzo, por debajo del panel */
+      cursor: pointer;
+      user-select: none;
+    }
+    #details-strip:hover{ filter: brightness(0.985); }
+    #details-text{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
+    #details-caret{ font-size: 12px; color: #636a8a; }
   </style>
 </head>
 <body>
@@ -100,6 +119,12 @@
 
   <!-- Lienzo Konva -->
   <div id="container" aria-label="Área de trabajo"></div>
+
+  <!-- Franja fija de detalles (siempre visible) -->
+  <div id="details-strip" role="button" aria-controls="panel" aria-expanded="false" title="Mostrar detalles">
+    <span id="details-text">Detalles…</span>
+    <span id="details-caret">⬆︎</span>
+  </div>
 
   <!-- Panel inferior (plegable) -->
   <div id="panel-wrap">
