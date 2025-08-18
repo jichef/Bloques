@@ -305,8 +305,10 @@ function updateStatus(){
   if (modo === 'construccion'){
     const {units,tens,hundreds,total}=countAll();
     const enLetras=numEnLetras(total);
+
     const st=document.getElementById('status');
     if(st) st.textContent=`Total: ${total} — ${hundreds} centenas, ${tens} decenas, ${units} unidades — (${enLetras})`;
+
     const b=document.getElementById('breakdown');
     if(b){
       b.innerHTML = `
@@ -316,8 +318,12 @@ function updateStatus(){
         <div class="label">Total</div><div class="value">${total}</div>
         <div class="label">En letras</div><div class="value">${enLetras}</div>`;
     }
-    // ✅ mini‑resumen en la barra superior
+
+    // Mini‑resumen (arriba)
     setMiniStatus(`Total: ${total}  |  ${hundreds}c  ${tens}d  ${units}u  (${enLetras})`);
+
+    // Franja fija (abajo)
+    setDetailsStrip(`Construcción — C:${hundreds} (${hundreds*100}) · D:${tens} (${tens*10}) · U:${units} (${units})  |  Total ${total} (${enLetras})`);
 
     if(challengeNumber!==null && total===challengeNumber){
       const ch=document.getElementById('challenge'); const msg=`🎉 ¡Correcto! Has formado ${enLetras}`;
@@ -330,8 +336,10 @@ function updateStatus(){
   const a = countInRect(zoneA);
   const b = countInRect(zoneB);
   const r = countInRect(zoneR);
+
   const st=document.getElementById('status');
   if(st) st.textContent = `A: ${a.total}  +  B: ${b.total}  =  Resultado: ${r.total}`;
+
   const bd=document.getElementById('breakdown');
   if (bd){
     bd.innerHTML = `
@@ -341,11 +349,19 @@ function updateStatus(){
       <div class="label">Resultado</div><div class="value">${r.total}</div>
     `;
   }
-  // ✅ mini‑resumen en la barra superior
+
+  // Mini‑resumen (arriba)
   setMiniStatus(
     `A=${a.total}  B=${b.total}  R=${r.total}  |  ` +
     `A: ${a.hundreds}c-${a.tens}d-${a.units}u · ` +
     `B: ${b.hundreds}c-${b.tens}d-${b.units}u`
+  );
+
+  // Franja fija (abajo)
+  setDetailsStrip(
+    `Sumas — A: ${a.hundreds}c ${a.tens}d ${a.units}u (=${a.total})  ·  ` +
+    `B: ${b.hundreds}c ${b.tens}d ${b.units}u (=${b.total})  ·  ` +
+    `R: ${r.hundreds}c ${r.tens}d ${r.units}u (=${r.total})`
   );
 
   const ch = document.getElementById('challenge');
@@ -662,6 +678,7 @@ function setUIForMode(){
   // Reposicionar SPAWN y refrescar estado
   resetSpawnBase();
   updateStatus();
+  syncDetailsStripWithPanel();
   ensureMiniStatus();   
 }
 
@@ -978,6 +995,7 @@ applyWorldTransform();
 resetSpawnBase();
 ensureMiniStatus();     // <-- añade esto
 wireUI();
+syncDetailsStripWithPanel();
 updateStatus();
 pieceLayer.draw();
 startIntro();
