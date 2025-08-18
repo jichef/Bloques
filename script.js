@@ -138,7 +138,105 @@ function drawZonesConstruccion(){
   uiLayer.add(zoneTenRect, tenLbl, zoneHundRect, hunLbl);
   uiLayer.draw();
 }
+// === Composición GLOBAL (fuera de zonas) ===
+const GLOBAL_COMPOSE = true;
 
+// 10 unidades consecutivas en una MISMA fila -> 1 decena
+function composeGlobalUnitsRows(){
+  let changed = false;
+  const rows = new Map(); // y -> Set(x)
+  const arr = childrenGroups();
+
+  for (let i=0;i<arr.length;i++){
+    const g = arr[i];
+    if (pieceType(g) !== 'unit' || isStriked(g)) continue;
+    const b = boxForGroup(g);
+    const y = toCell(b.y), x = toCell(b.x);
+    if (!rows.has(y)) rows.set(y, new Map());
+    rows.get(y).set(x, g);
+  }
+
+  rows.forEach((mapX, rowY)=>{
+    const xs = [...mapX.keys()].sort((a,b)=>a-b);
+    // Busca secuencias consecutivas de paso GRID
+    let start = 0;
+    while (start < xs.length){
+      let end = start;
+      while (end+1 < xs.length && xs[end+1] === xs[end] + GRID) end++;
+      // secuencia [start..end] tiene (end-start+1) elementos
+      while ((end - start + 1) >= 10){
+        // Toma los 10 primeros de la secuencia
+        const tenXs = xs.slice(start, start+10);
+        const nodes = tenXs.map(x => mapX.get(x)).filter(Boolean);
+        if (nodes.length === 10){
+          const a = snap(nodes[0].x(), nodes[0].y());
+          nodes.forEach(n => n.destroy());
+          createTen(a.x, a.y);
+          changed = true;
+        }
+        // Avanza 10 posiciones dentro de la secuencia
+        start += 10;
+      }
+      start = end + 1;
+    }
+  });
+
+  if (changed) pieceLayer.batchDraw();
+  return changed;
+}
+
+// 10 decenas consecutivas en una MISMA columna -> 1 centena
+function composeGlobalTensCols(){
+  let changed = false;
+  const cols = new Map(); // x -> Map(y -> node)
+  const arr = childrenGroups();
+
+  for (let i=0;i<arr.length;i++){
+    const g = arr[i];
+    if (pieceType(g) !== 'ten' || isStriked(g)) continue;
+    const b = boxForGroup(g);
+    const x = toCell(b.x), y = toCell(b.y);
+    if (!cols.has(x)) cols.set(x, new Map());
+    cols.get(x).set(y, g);
+  }
+
+  cols.forEach((mapY, colX)=>{
+    const ys = [...mapY.keys()].sort((a,b)=>a-b);
+    // Busca secuencias verticales consecutivas (paso GRID)
+    let start = 0;
+    while (start < ys.length){
+      let end = start;
+      while (end+1 < ys.length && ys[end+1] === ys[end] + GRID) end++;
+      while ((end - start + 1) >= 10){
+        const tenYs = ys.slice(start, start+10);
+        const nodes = tenYs.map(y => mapY.get(y)).filter(Boolean);
+        if (nodes.length === 10){
+          const a = snap(nodes[0].x(), nodes[0].y());
+          nodes.forEach(n => n.destroy());
+          createHundred(a.x, a.y); // se coloca en la esquina sup-izq del bloque
+          changed = true;
+        }
+        start += 10;
+      }
+      start = end + 1;
+    }
+  });
+
+  if (changed) pieceLayer.batchDraw();
+  return changed;
+}
+
+// Ejecuta ambas hasta estabilizar
+function composeGlobal(){
+  if (!GLOBAL_COMPOSE) return false;
+  let changed, any = false;
+  do{
+    changed = false;
+    if (composeGlobalUnitsRows())   { changed = true; any = true; }
+    if (composeGlobalTensCols())    { changed = true; any = true; }
+  } while (changed);
+  return any;
+}
 // ---------- Operaciones (suma/resta): A / B / Resultado ----------
 function computeZonesSumas(){
   const v = visibleWorldRect();
@@ -648,6 +746,7 @@ function onDragEnd(group){
       if (type==='unit' && rectsIntersect(b, ZONES.tens)) { group.position(snap(ZONES.tens.x, ZONES.tens.y)); reorderTensZone(); checkBuildZones(); }
       if ((type==='unit'||type==='ten') && rectsIntersect(b, ZONES.hund)) { group.position(snap(ZONES.hund.x, ZONES.hund.y)); reorderHundredsZone(); checkBuildZones(); }
     }
+    if (GLOBAL_COMPOSE) composeGlobal();
     pieceLayer.draw(); updateStatus();
   });
 }
@@ -665,8 +764,9 @@ function createUnit(x,y){
   let pos; if (x==null||y==null){ const r=findSpawnRect(w,h); pos={x:r.x,y:r.y}; advanceSpawn(w,h);} else pos=snap(x,y);
   const g=new Konva.Group({ x:pos.x,y:pos.y, draggable:true, name:'unit' }); g.setAttr('btype','unit'); addChipRectTo(g,w,h,COLORS.unit);
   onDragEnd(g);
+  
   attachStrikeHandlers(g);
-  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
+  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus();if (GLOBAL_COMPOSE) { composeGlobal(); checkBuildZones?.(); } ; return g;// reordena zonas si aplica
 }
 function createTen(x,y){
   const w=10*GRID,h=GRID;
@@ -681,7 +781,7 @@ function createTen(x,y){
     for(let k=0;k<10;k++) createUnit(start.x+k*GRID, start.y); 
     pieceLayer.draw(); checkBuildZones(); updateStatus(); 
   });
-  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
+  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); if (GLOBAL_COMPOSE) { composeGlobal(); checkBuildZones?.(); } ; return g;
 }
 function createHundred(x,y){
   const w=10*GRID,h=10*GRID;
@@ -696,7 +796,7 @@ function createHundred(x,y){
     for(let row=0;row<10;row++) createTen(start.x, start.y+row*GRID); 
     pieceLayer.draw(); checkBuildZones(); updateStatus(); 
   });
-  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); return g;
+  pieceLayer.add(g); pieceLayer.draw(); checkBuildZones(); updateStatus(); if (GLOBAL_COMPOSE) { composeGlobal(); checkBuildZones?.(); } ; return g;
 }
 
 // ===== Construcción: composición automática (ignorando tachados) =====
