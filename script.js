@@ -1163,34 +1163,37 @@ function newSum(a=null, b=null){
   try { speak(`Nueva suma: ${a} más ${b}`); } catch {}
 }
 
-function newSub(a=null, b=null){
+function newSub(a = null, b = null) {
   oper = 'resta';
-  if (modo!=='sumas') enterMode('sumas');
+  if (modo !== 'sumas') enterMode('sumas');
 
-  // Elegir operandos por dificultad si no vienen dados
-  if (a===null || b===null) {
-    [a, b] = pickSubOperands(difficulty);
+  // Mapea el nivel de la UI (basico/avanzado/experto) a los niveles internos (facil/media/dificil/experto)
+  const map = { basico: 'facil', avanzado: 'media', experto: 'experto' };
+  const mapped = map[currentSumDifficulty] || 'media';
+
+  // Si no se pasan operandos, elige según el nivel mapeado
+  if (a === null || b === null) {
+    [a, b] = pickSubOperands(mapped);
   }
 
   // Garantiza A ≥ B
   if (b > a) [a, b] = [b, a];
 
+  // Limpia piezas y fija operación activa
   pieceLayer.destroyChildren(); pieceLayer.draw();
-
-  // Recuerda operación activa
-  currentOp = { type:'resta', a, b };
+  currentOp = { type: 'resta', a, b };
 
   const info = document.getElementById('sum-info');
-  if (info){
+  if (info) {
     info.style.display = 'inline';
     info.textContent = `Resta: ${a} − ${b}. Construye ${a} en “${LABELS.resta.A} (A)”, ${b} en “${LABELS.resta.B} (B)” y deja el resultado en “${LABELS.resta.R}”.`;
   }
 
-  computeZonesSumas(); 
-  drawZonesSumas(); 
+  computeZonesSumas();
+  drawZonesSumas();
   resetSpawnBase();
   updateStatus();
-  try{ speak(`Nueva resta: ${a} menos ${b}`);}catch{}
+  try { speak(`Nueva resta: ${a} menos ${b}`); } catch {}
 }
 // === Asegurar mini-resumen visible en la barra ===
 function ensureMiniStatus(){
