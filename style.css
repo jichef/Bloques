@@ -14,9 +14,7 @@
   --text:#1f2340;
   --muted:#636a8a;
   --btn:#ffffff;
-
-  /* Altura visible de la franja “Detalles” */
-  --strip-h: 44px;
+  --strip-h: 44px; /* Altura visible de la franja “Detalles” */
 }
 
 html, body {
@@ -27,7 +25,7 @@ html, body {
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
-/* ===== Lienzo: reserva espacio para la franja inferior + área segura ===== */
+/* ===== Lienzo ===== */
 #container {
   position: fixed;
   top: 0;
@@ -52,6 +50,7 @@ html, body {
 button {
   appearance: none; border: 1px solid var(--border); background: var(--btn);
   padding: 6px 10px; border-radius: 8px; font-size: 14px; cursor: pointer;
+  touch-action: manipulation;
 }
 button:hover { filter: brightness(0.97); }
 button.active { border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108,92,231,0.15) inset; }
@@ -62,50 +61,53 @@ button.active { border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108,92,231,0.1
   font-size: 14px;
   color:#1f2340;
   white-space: nowrap;
-  font-family: 'EscolarG', sans-serif; /* fuente escolar */
+  font-family: 'EscolarG', sans-serif;
 }
 
 /* ===== Franja inferior fija: “Detalles” ===== */
 #details-strip{
   position: fixed;
-  left: 0; right: 0;
-  bottom: 2px; /* subida ligera */
+  left: 0; right: 0; bottom: 0;
   height: calc(var(--strip-h) + env(safe-area-inset-bottom, 0px));
   display: flex; align-items: center; gap: 10px;
   padding: 0 14px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: rgba(255,255,255,0.96);
   border-top: 1px solid var(--border);
-  font-size: 20px; /* más grande */
+  font-size: 18px;
   color: #1f2340;
-  z-index: 25;
+  z-index: 1000;
   cursor: pointer;
   user-select: none;
-
-  /* 👇 fuerza tipografía Escolar */
-  font-family: 'Escolar', 'EscolarG', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: 'EscolarG', sans-serif;
+  touch-action: manipulation;
 }
 #details-text{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
 #details-caret{ font-size: 14px; color: #636a8a; }
 
 /* ===== Panel inferior (plegable) ===== */
-#panel-wrap { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; }
-
-#panel {
-  max-height: 80dvh; /* más alto */
-  overflow: auto;
-  background: rgba(255,255,255,0.96);
+#panel-wrap{
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 1100;
+  pointer-events: none; /* no bloquea clics si está cerrado */
+}
+#panel{
+  background: rgba(255,255,255,0.97);
   border-top: 1px solid var(--border);
   padding: 10px 14px;
-  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); /* margen extra */
+  min-height: var(--strip-h);
+  max-height: 85vh;              /* más alto para que no corte el “Total” */
+  overflow: auto;
   transform: translateY(calc(100% - var(--strip-h)));
-  transition: transform .25s ease;
+  transition: transform 0.28s ease;
+  will-change: transform;
   pointer-events: none;
   font-size: 18px;
 }
-#panel #panel-toggle { pointer-events: auto; }
-#panel.open {
-  transform: translateY(0%);
+#panel #panel-toggle{ pointer-events: auto; }
+#panel.open{
+  transform: translateY(0);
   pointer-events: auto;
 }
 #panel-header { display: flex; align-items: center; gap: 10px; }
@@ -135,17 +137,7 @@ button.active { border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108,92,231,0.1
 .d { color:#ff3b30; font-weight:700; } /* decenas  (rojo)  */
 .u { color:#1f78ff; font-weight:700; } /* unidades (azul)  */
 
-/* iOS: evitar zoom extraño al tocar botones */
-button { touch-action: manipulation; }
-
 /* Ajuste móvil */
 @media (max-width: 720px){
-  #panel { max-height: 88dvh; }
+  /* :root { --strip-h: 50px; } */
 }
-
-/* Evita que el contenedor superior bloquee clics cuando el panel está cerrado */
-#panel-wrap { pointer-events: none; }
-#panel { pointer-events: none; }
-#panel.open { pointer-events: auto; }
-#panel #panel-toggle { pointer-events: auto; }
-#details-strip { touch-action: manipulation; }
