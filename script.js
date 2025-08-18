@@ -1052,6 +1052,9 @@ function wireUI(){
 
       case 'btn-zoom-in':  zoomStep(+1); break;
       case 'btn-zoom-out': zoomStep(-1); break;
+case 'btn-sumdiff-basico':   setSumDifficulty('basico');   break;
+case 'btn-sumdiff-avanzado': setSumDifficulty('avanzado'); break;
+case 'btn-sumdiff-experto':  setSumDifficulty('experto');  break;
 case 'btn-diff-inicial':  setDifficulty('inicial');  break;
 case 'btn-diff-medio':    setDifficulty('medio');    break;
 case 'btn-diff-avanzado': setDifficulty('avanzado'); break;
@@ -1120,6 +1123,7 @@ case 'btn-challenge': {
   // Estado inicial coherente
   setUIForMode();
   renderDifficultyUI();
+  renderSumDifficultyUI();
   syncDetailsStripWithPanel();
 }
 
