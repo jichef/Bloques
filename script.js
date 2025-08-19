@@ -759,66 +759,56 @@ function onDouble(group, cb){
 
 // ===== Crear piezas (usa SPAWN) =====
 function addChipRectTo(g,w,h,fill){ g.add(new Konva.Rect({x:0,y:0,width:w,height:h,fill,...CHIP_STYLE})); }
-function createUnit(x, y){
+// ================== createUnit (con modo silencioso) ==================
+function createUnit(x, y, opts = {}){
+  const { silent = false } = opts;
   const w = GRID, h = GRID;
-  let pos;
-  if (x == null || y == null){
-    const r = findSpawnRect(w, h);
-    pos = { x: r.x, y: r.y };
-    advanceSpawn(w, h);
-  } else {
-    pos = snap(x, y);
-  }
 
-  const g = new Konva.Group({
-    x: pos.x, y: pos.y,
-    draggable: true,
-    name: 'unit'
-  });
-  g.setAttr('btype', 'unit');
-  g.tipo = 'unit';                        // 👈 importante
+  const pos = (x == null || y == null)
+    ? (()=>{ const r = findSpawnRect(w, h); advanceSpawn(w,h); return {x:r.x, y:r.y}; })()
+    : snap(x, y);
+
+  const g = new Konva.Group({ x: pos.x, y: pos.y, draggable: true, name: 'unit' });
+  g.setAttr('btype', 'unit'); g.tipo = 'unit';
 
   addChipRectTo(g, w, h, COLORS.unit);
   onDragEnd(g);
   attachStrikeHandlers(g);
 
   pieceLayer.add(g);
-  pieceLayer.draw();
-  checkBuildZones();
-  updateStatus();
+
+  if (!silent){
+    pieceLayer.draw();
+    checkBuildZones();
+    updateStatus();
+  }
   return g;
 }
 
-function createTen(x, y){
+// ================== createTen (acepta {silent} + descompone a 10U) ==================
+function createTen(x, y, opts = {}){
+  const { silent = false } = opts;
   const w = 10*GRID, h = GRID;
-  let pos;
-  if (x == null || y == null){
-    const r = findSpawnRect(w, h);
-    pos = { x: r.x, y: r.y };
-    advanceSpawn(w, h);
-  } else {
-    pos = snap(x, y);
-  }
 
-  const g = new Konva.Group({
-    x: pos.x, y: pos.y,
-    draggable: true,
-    name: 'ten'
-  });
-  g.setAttr('btype', 'ten');
-  g.tipo = 'ten';                         // 👈 importante
+  const pos = (x == null || y == null)
+    ? (()=>{ const r = findSpawnRect(w, h); advanceSpawn(w,h); return {x:r.x, y:r.y}; })()
+    : snap(x, y);
+
+  const g = new Konva.Group({ x: pos.x, y: pos.y, draggable: true, name: 'ten' });
+  g.setAttr('btype', 'ten'); g.tipo = 'ten';
 
   addChipRectTo(g, w, h, COLORS.ten);
   onDragEnd(g);
   attachStrikeHandlers(g);
 
-  // Doble clic: descomponer 1 decena → 10 unidades en la misma fila
+  // 🔁 Doble clic: 1 decena -> 10 unidades (en lote y silencioso)
   g.on('dblclick dbltap', ()=>{
-    if (isStriked(g)) return;            // no descomponer si está tachada
+    if (isStriked(g)) return;
     const start = snap(g.x(), g.y());
     g.destroy();
+
     for (let k = 0; k < 10; k++){
-      createUnit(start.x + k*GRID, start.y);
+      createUnit(start.x + k*GRID, start.y, { silent: true });
     }
     pieceLayer.draw();
     checkBuildZones();
@@ -826,42 +816,39 @@ function createTen(x, y){
   });
 
   pieceLayer.add(g);
-  pieceLayer.draw();
-  checkBuildZones();
-  updateStatus();
+
+  if (!silent){
+    pieceLayer.draw();
+    checkBuildZones();
+    updateStatus();
+  }
   return g;
 }
 
-function createHundred(x, y){
+// ================== createHundred (acepta {silent} + descompone a 10D) ==================
+function createHundred(x, y, opts = {}){
+  const { silent = false } = opts;
   const w = 10*GRID, h = 10*GRID;
-  let pos;
-  if (x == null || y == null){
-    const r = findSpawnRect(w, h);
-    pos = { x: r.x, y: r.y };
-    advanceSpawn(w, h);
-  } else {
-    pos = snap(x, y);
-  }
 
-  const g = new Konva.Group({
-    x: pos.x, y: pos.y,
-    draggable: true,
-    name: 'hundred'
-  });
-  g.setAttr('btype', 'hundred');
-  g.tipo = 'hundred';                     // 👈 importante
+  const pos = (x == null || y == null)
+    ? (()=>{ const r = findSpawnRect(w, h); advanceSpawn(w,h); return {x:r.x, y:r.y}; })()
+    : snap(x, y);
+
+  const g = new Konva.Group({ x: pos.x, y: pos.y, draggable: true, name: 'hundred' });
+  g.setAttr('btype', 'hundred'); g.tipo = 'hundred';
 
   addChipRectTo(g, w, h, COLORS.hundred);
   onDragEnd(g);
   attachStrikeHandlers(g);
 
-  // Doble clic: descomponer 1 centena → 10 decenas en columna
+  // 🔁 Doble clic: 1 centena -> 10 decenas (en lote y silencioso)
   g.on('dblclick dbltap', ()=>{
     if (isStriked(g)) return;
     const start = snap(g.x(), g.y());
     g.destroy();
+
     for (let row = 0; row < 10; row++){
-      createTen(start.x, start.y + row*GRID);
+      createTen(start.x, start.y + row*GRID, { silent: true });
     }
     pieceLayer.draw();
     checkBuildZones();
@@ -869,9 +856,12 @@ function createHundred(x, y){
   });
 
   pieceLayer.add(g);
-  pieceLayer.draw();
-  checkBuildZones();
-  updateStatus();
+
+  if (!silent){
+    pieceLayer.draw();
+    checkBuildZones();
+    updateStatus();
+  }
   return g;
 }
 function checkBuildZones(){
